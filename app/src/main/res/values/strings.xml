@@ -1,0 +1,5 @@
+<resources>
+    <string name="app_name">FCM Guard</string>
+    <string name="channel_name">FCM Guard Service</string>
+    <string name="channel_description">Active guardian keeping FCM push connection alive on HyperOS</string>
+</resources>

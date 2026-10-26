@@ -1,0 +1,6 @@
+{
+  "name": "FCM Guard",
+  "description": "Push Notification Guardian for Xiaomi HyperOS & Android",
+  "requestFramePermissions": [],
+  "majorCapabilities": ["MAJOR_CAPABILITY_SERVER_SIDE_GEMINI_API"]
+}
