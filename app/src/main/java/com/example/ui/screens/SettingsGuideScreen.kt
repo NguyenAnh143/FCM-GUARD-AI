@@ -139,7 +139,7 @@ fun SettingsGuideScreen(
             sheetState = rememberModalBottomSheetState(skipPartiallyExpanded = true)
         ) {
             ReadmeSheetContent(
-                version = "1.1.0",
+                version = "1.2.0 (Build 3)",
                 onDismiss = { showReadmeSheet = false }
             )
         }
@@ -421,7 +421,7 @@ fun SettingsGuideScreen(
                     )
                     Spacer(modifier = Modifier.height(2.dp))
                     Text(
-                        text = "Phiên bản 1.1.0 (Build 2) • Xiaomi HyperOS & Android",
+                        text = "Phiên bản 1.2.0 (Build 3) • Xiaomi HyperOS & Android",
                         style = MaterialTheme.typography.bodySmall,
                         color = MaterialTheme.colorScheme.onSurfaceVariant
                     )
@@ -510,6 +510,16 @@ private fun ReadmeSheetContent(
     version: String,
     onDismiss: () -> Unit
 ) {
+    val context = LocalContext.current
+    val readmeText = remember(context) {
+        try {
+            context.assets.open("readme.md").bufferedReader().use { it.readText() }
+        } catch (_: Exception) {
+            "# FCM Guard\n\nREADME content not found.\n\n" +
+                "Please ensure app/src/main/assets/readme.md is included in the project."
+        }
+    }
+
     LazyColumn(
         modifier = Modifier
             .fillMaxWidth()
@@ -532,46 +542,10 @@ private fun ReadmeSheetContent(
 
         item {
             Text(
-                text = "File APK đã được build thành công:",
-                fontWeight = FontWeight.Bold,
-                style = MaterialTheme.typography.titleSmall
-            )
-            Text(
-                text = "Tên file: FCM_Guard.apk (Đặt trực tiếp tại thư mục gốc dự án)\n" +
-                        "Tải trực tiếp bằng cách click chuột phải vào file FCM_Guard.apk bên cây thư mục trái -> Download.",
+                text = readmeText,
                 style = MaterialTheme.typography.bodySmall,
-                color = MaterialTheme.colorScheme.primary
-            )
-        }
-
-        item {
-            Text(
-                text = "Tính năng mới:",
-                fontWeight = FontWeight.Bold,
-                style = MaterialTheme.typography.titleSmall
-            )
-            Text(
-                text = "• Giao diện Đen Trắng tối giản, dịu mắt ở cả chế độ Tối và chế độ Sáng.\n" +
-                        "• Tính năng 'Xóa dữ liệu Pin & Hiệu suất' ngay tại Bảng điều khiển: Nhấn vào sẽ nhảy thẳng đến màn hình Thông tin ứng dụng của com.miui.powerkeeper để bạn bấm Clear all data.",
-                style = MaterialTheme.typography.bodySmall,
-                color = MaterialTheme.colorScheme.onSurfaceVariant
-            )
-        }
-
-        item {
-            Text(
-                text = "Triết lý bảo mật:",
-                fontWeight = FontWeight.Bold,
-                style = MaterialTheme.typography.titleSmall
-            )
-            Text(
-                text = "• Không Root\n" +
-                        "• Không Shizuku\n" +
-                        "• Không Accessibility Service\n" +
-                        "• Không VPN ngầm\n" +
-                        "• Thân thiện 100% với ứng dụng ngân hàng và tài chính (VCB, Techcombank, MB, Momo, VNPay...).",
-                style = MaterialTheme.typography.bodySmall,
-                color = MaterialTheme.colorScheme.onSurfaceVariant
+                color = MaterialTheme.colorScheme.onSurfaceVariant,
+                lineHeight = 18.sp
             )
         }
 
