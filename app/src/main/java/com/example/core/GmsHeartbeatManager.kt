@@ -31,15 +31,17 @@ object GmsHeartbeatManager {
         reason: String,
         logDao: HeartbeatLogDao? = null
     ): HeartbeatResult = withContext(Dispatchers.IO) {
-        // 1. Send MCS Heartbeat broadcast to Google Play Services
+        // 1. Send MCS Heartbeat broadcast to Google Play Services with Foreground Priority
         try {
             val mcsIntent = Intent("com.google.android.intent.action.MCS_HEARTBEAT").apply {
                 setPackage("com.google.android.gms")
+                addFlags(Intent.FLAG_RECEIVER_FOREGROUND or Intent.FLAG_INCLUDE_STOPPED_PACKAGES)
             }
             context.sendBroadcast(mcsIntent)
 
             val gtalkIntent = Intent("com.google.android.intent.action.GTALK_HEARTBEAT").apply {
                 setPackage("com.google.android.gms")
+                addFlags(Intent.FLAG_RECEIVER_FOREGROUND or Intent.FLAG_INCLUDE_STOPPED_PACKAGES)
             }
             context.sendBroadcast(gtalkIntent)
         } catch (e: Exception) {

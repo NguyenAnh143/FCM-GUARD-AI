@@ -139,7 +139,7 @@ fun SettingsGuideScreen(
             sheetState = rememberModalBottomSheetState(skipPartiallyExpanded = true)
         ) {
             ReadmeSheetContent(
-                version = "1.2.0 (Build 3)",
+                version = "1.3.0",
                 onDismiss = { showReadmeSheet = false }
             )
         }
@@ -421,7 +421,7 @@ fun SettingsGuideScreen(
                     )
                     Spacer(modifier = Modifier.height(2.dp))
                     Text(
-                        text = "Phiên bản 1.2.0 (Build 3) • Xiaomi HyperOS & Android",
+                        text = "Phiên bản 1.3.0 (Build 4) • Xiaomi HyperOS & Android",
                         style = MaterialTheme.typography.bodySmall,
                         color = MaterialTheme.colorScheme.onSurfaceVariant
                     )
@@ -510,39 +510,201 @@ private fun ReadmeSheetContent(
     version: String,
     onDismiss: () -> Unit
 ) {
-    val context = LocalContext.current
-    val readmeText = remember(context) {
-        try {
-            context.assets.open("readme.md").bufferedReader().use { it.readText() }
-        } catch (_: Exception) {
-            "# FCM Guard\n\nREADME content not found.\n\n" +
-                "Please ensure app/src/main/assets/readme.md is included in the project."
-        }
-    }
-
     LazyColumn(
         modifier = Modifier
             .fillMaxWidth()
             .padding(horizontal = 20.dp, vertical = 10.dp),
-        verticalArrangement = Arrangement.spacedBy(12.dp)
+        verticalArrangement = Arrangement.spacedBy(14.dp)
     ) {
         item {
             Text(
-                text = "🛡️ FCM Guard v$version",
+                text = "🛡️ FCM Guard — Push Notification Guardian",
                 style = MaterialTheme.typography.titleLarge,
                 fontWeight = FontWeight.ExtraBold,
                 color = MaterialTheme.colorScheme.onSurface
             )
             Text(
-                text = "Push Notification Guardian for Xiaomi HyperOS & Android",
+                text = "Phiên bản $version (Build 4) • Xiaomi HyperOS & Android",
                 style = MaterialTheme.typography.bodySmall,
                 color = MaterialTheme.colorScheme.onSurfaceVariant
             )
+            Spacer(modifier = Modifier.height(4.dp))
+            Text(
+                text = "Giải pháp tối ưu hóa và duy trì thông báo đẩy Firebase Cloud Messaging (FCM) dành riêng cho các thiết bị Xiaomi HyperOS / MIUI và Android — Tiết kiệm pin, không cần Root, thân thiện 100% với ứng dụng ngân hàng.",
+                style = MaterialTheme.typography.bodySmall,
+                color = MaterialTheme.colorScheme.onSurface,
+                lineHeight = 18.sp
+            )
         }
 
+        // Section: File APK
+        item {
+            OutlinedCard(
+                shape = RoundedCornerShape(12.dp),
+                colors = CardDefaults.outlinedCardColors(
+                    containerColor = MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.5f)
+                ),
+                border = CardDefaults.outlinedCardBorder().copy(
+                    brush = androidx.compose.ui.graphics.SolidColor(MaterialTheme.colorScheme.outline)
+                ),
+                modifier = Modifier.fillMaxWidth()
+            ) {
+                Column(modifier = Modifier.padding(14.dp)) {
+                    Text(
+                        text = "📦 File APK cài đặt (FCM_Guard.apk)",
+                        fontWeight = FontWeight.Bold,
+                        style = MaterialTheme.typography.titleSmall
+                    )
+                    Spacer(modifier = Modifier.height(6.dp))
+                    Text(
+                        text = "• File APK: FCM_Guard.apk\n" +
+                               "• Vị trí: Đặt trực tiếp tại thư mục gốc của dự án (/\n" +
+                               "• Phiên bản: $version (Build 4)\n" +
+                               "• Cách tải: Click chuột phải vào file FCM_Guard.apk trong cây thư mục bên trái → Chọn 'Download' (hoặc xuất file ZIP dự án).",
+                        style = MaterialTheme.typography.bodySmall,
+                        color = MaterialTheme.colorScheme.onSurface,
+                        lineHeight = 18.sp
+                    )
+                }
+            }
+        }
+
+        // Section: Overview
         item {
             Text(
-                text = readmeText,
+                text = "🌟 Giới thiệu tổng quan",
+                fontWeight = FontWeight.Bold,
+                style = MaterialTheme.typography.titleMedium
+            )
+            Spacer(modifier = Modifier.height(4.dp))
+            Text(
+                text = "Trên hệ điều hành Xiaomi HyperOS và MIUI, cơ chế quản lý pin nghiêm ngặt thường xuyên ngắt kết nối socket ngầm của Google Play Services (GMS) tới máy chủ Google FCM (mtalk.google.com:5228), khiến thông báo từ các ứng dụng như Facebook Messenger, Zalo, Telegram, WhatsApp... bị trễ hoặc chỉ xuất hiện khi người dùng mở ứng dụng.\n\n" +
+                        "FCM Guard được thiết kế theo triết lý: Đặc quyền thấp nhất – Độ tin cậy cao nhất – Tuyệt đối an toàn cho tài chính. Ứng dụng khôi phục và duy trì kênh nhận tin push bằng các Intent hệ thống tiêu chuẩn mà không can thiệp sâu vào nhân hệ điều hành.",
+                style = MaterialTheme.typography.bodySmall,
+                color = MaterialTheme.colorScheme.onSurfaceVariant,
+                lineHeight = 18.sp
+            )
+        }
+
+        // Section: 8 Key Features
+        item {
+            Text(
+                text = "🚀 Các tính năng chính",
+                fontWeight = FontWeight.Bold,
+                style = MaterialTheme.typography.titleMedium
+            )
+            Spacer(modifier = Modifier.height(6.dp))
+
+            val features = listOf(
+                "1. Thân thiện tuyệt đối với ứng dụng ngân hàng" to "Không Root, Không Shizuku, Không Accessibility Service (trợ năng), Không VPN ngầm, Không Device Admin. Tuyệt đối không bị các ứng dụng ngân hàng (VCB Digibank, Techcombank, MB Bank, BIDV, VPBank, MoMo, VNPay...) phát hiện hay từ chối mở.",
+                "2. Giám sát thông minh theo sự kiện & Siêu tiết kiệm pin" to "Chỉ kích hoạt kiểm tra khi có sự kiện mạng phục hồi hoặc khi bật sáng màn hình. Tùy chọn chu kỳ bảo vệ dự phòng: 10 phút, 15 phút, 30 phút (Mặc định). Tích hợp AlarmManager chính xác với WakeLock ngắn để duy trì socket khi tắt màn hình lâu mà không tốn pin.",
+                "3. Thông báo chạy ngầm tùy chọn (Persistent Notification)" to "Cho phép bật/tắt hiển thị thông báo chạy ngầm tùy ý để thanh thông báo luôn gọn gàng.",
+                "4. Trợ lý ứng dụng FCM & Đọc trạng thái Autostart HyperOS" to "Tự động quét toàn bộ ứng dụng sử dụng FCM. Đọc trạng thái Tự khởi chạy HyperOS (OP_AUTO_START = 10008) và phân loại 3 danh mục rõ ràng: Đã bật, Đã tắt, Không rõ. Nhấn vào bất kỳ app nào để mở trang Cài đặt cấu hình nhanh.",
+                "5. Chẩn đoán kết nối Socket thời gian thực" to "Kiểm tra trực tiếp cổng TCP socket mtalk.google.com:5228, thời gian phân giải DNS, độ trễ TCP Handshake và phím tắt gọi giao diện chẩn đoán Google Play Services (*#*#426#*#*).",
+                "6. Nhật ký theo dõi độ trễ & Mất kết nối" to "Lưu trữ lịch sử các lần kiểm tra, đánh thức socket, ghi nhận sự cố mạng giúp người dùng đánh giá độ ổn định kết nối FCM.",
+                "7. Giao diện Đa ngôn ngữ & Chế độ Đen Trắng tối giản" to "Hỗ trợ 11 ngôn ngữ (Tiếng Việt, English, 中文, Español, 日本語, 한국어, Français, Deutsch, Русский, Português, Bahasa Indonesia). Phong cách Đen Trắng đơn sắc tối giản, dịu mắt ở cả chế độ Sáng và chế độ Tối.",
+                "8. Tối ưu cho màn hình nhỏ & dòng máy Xiaomi" to "Toàn bộ nút bấm, hộp thoại, thanh điều hướng và nhãn chữ được tối ưu để không bị che mất chữ trên các màn hình từ 320dp đến 480dp."
+            )
+
+            Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
+                features.forEach { (title, desc) ->
+                    OutlinedCard(
+                        shape = RoundedCornerShape(10.dp),
+                        colors = CardDefaults.outlinedCardColors(
+                            containerColor = MaterialTheme.colorScheme.surface
+                        ),
+                        border = CardDefaults.outlinedCardBorder().copy(
+                            brush = androidx.compose.ui.graphics.SolidColor(MaterialTheme.colorScheme.outline)
+                        ),
+                        modifier = Modifier.fillMaxWidth()
+                    ) {
+                        Column(modifier = Modifier.padding(12.dp)) {
+                            Text(
+                                text = title,
+                                fontWeight = FontWeight.Bold,
+                                style = MaterialTheme.typography.titleSmall,
+                                color = MaterialTheme.colorScheme.onSurface
+                            )
+                            Spacer(modifier = Modifier.height(4.dp))
+                            Text(
+                                text = desc,
+                                style = MaterialTheme.typography.bodySmall,
+                                color = MaterialTheme.colorScheme.onSurfaceVariant,
+                                lineHeight = 17.sp
+                            )
+                        }
+                    }
+                }
+            }
+        }
+
+        // Section: Screen-Off Messenger Troubleshooting
+        item {
+            OutlinedCard(
+                shape = RoundedCornerShape(12.dp),
+                colors = CardDefaults.outlinedCardColors(
+                    containerColor = MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.5f)
+                ),
+                border = CardDefaults.outlinedCardBorder().copy(
+                    brush = androidx.compose.ui.graphics.SolidColor(MaterialTheme.colorScheme.outline)
+                ),
+                modifier = Modifier.fillMaxWidth()
+            ) {
+                Column(modifier = Modifier.padding(14.dp)) {
+                    Text(
+                        text = "💡 Mẹo sửa lỗi Messenger & Chat khi tắt màn hình lâu",
+                        fontWeight = FontWeight.Bold,
+                        style = MaterialTheme.typography.titleSmall
+                    )
+                    Spacer(modifier = Modifier.height(6.dp))
+                    Text(
+                        text = "Nếu Messenger (Facebook Messenger), Zalo, Telegram không thông báo khi để tắt màn hình lâu:\n\n" +
+                                "1️⃣ Tự khởi chạy: Vào Thông tin ứng dụng Messenger → Bật 'Tự khởi chạy'. (Bắt buộc để HyperOS không chặn Google Play Services đánh thức Messenger).\n" +
+                                "2️⃣ Tiết kiệm pin: Chọn 'Không hạn chế' (No restrictions).\n" +
+                                "3️⃣ Cài đặt Pin HyperOS: Vào ứng dụng Bảo mật → Pin → Cài đặt (icon bánh răng) → Đặt 'Tắt dữ liệu di động khi thiết bị bị khóa' là 'Không bao giờ'.\n" +
+                                "4️⃣ Khóa trong Đa nhiệm: Mở màn hình Đa nhiệm (Recent apps) → Nhấn giữ ô Messenger → Bấm biểu tượng Ổ Khóa.\n" +
+                                "5️⃣ Xóa dữ liệu Pin & Hiệu suất: Tại Bảng điều khiển FCM Guard, nhấn 'Mở trang Thông tin ứng dụng để Xóa dữ liệu' của Pin & Hiệu suất (com.miui.powerkeeper) để xóa các giới hạn ngắt tiến trình tích tụ.",
+                        style = MaterialTheme.typography.bodySmall,
+                        color = MaterialTheme.colorScheme.onSurface,
+                        lineHeight = 18.sp
+                    )
+                }
+            }
+        }
+
+        // Section: 4-Step Quick Setup
+        item {
+            Text(
+                text = "🛠️ Hướng dẫn cài đặt nhanh 4 bước",
+                fontWeight = FontWeight.Bold,
+                style = MaterialTheme.typography.titleMedium
+            )
+            Spacer(modifier = Modifier.height(4.dp))
+            Text(
+                text = "• Bước 1: Mở ứng dụng, tại Bảng điều khiển cấp quyền 'Sửa đổi cài đặt hệ thống' (nếu có).\n" +
+                        "• Bước 2: Nhấn 'Sửa lỗi ngay' để khởi động lại socket MCS của Google Play Services.\n" +
+                        "• Bước 3: Đảm bảo công tắc 'Tự động bảo vệ thông minh' luôn được BẬT.\n" +
+                        "• Bước 4: Cấp quyền 'Tự khởi chạy' cho FCM Guard và chọn Tiết kiệm pin là 'Không hạn chế'.",
+                style = MaterialTheme.typography.bodySmall,
+                color = MaterialTheme.colorScheme.onSurfaceVariant,
+                lineHeight = 18.sp
+            )
+        }
+
+        // Section: Tech Stack & Security
+        item {
+            Text(
+                text = "🏗️ Công nghệ & An toàn",
+                fontWeight = FontWeight.Bold,
+                style = MaterialTheme.typography.titleMedium
+            )
+            Spacer(modifier = Modifier.height(4.dp))
+            Text(
+                text = "• Ngôn ngữ: 100% Kotlin hiện đại\n" +
+                        "• UI: Jetpack Compose + Material Design 3 đơn sắc tối giản\n" +
+                        "• Kiến trúc: MVVM / Clean Architecture\n" +
+                        "• Dịch vụ ngầm: Foreground Service + AlarmManager + WakeLock ngắn bảo vệ Doze\n" +
+                        "• Cơ sở dữ liệu: Room Database (lưu trữ nhật ký cục bộ, tuyệt đối không gửi dữ liệu ra ngoài)",
                 style = MaterialTheme.typography.bodySmall,
                 color = MaterialTheme.colorScheme.onSurfaceVariant,
                 lineHeight = 18.sp
@@ -550,7 +712,7 @@ private fun ReadmeSheetContent(
         }
 
         item {
-            Spacer(modifier = Modifier.height(10.dp))
+            Spacer(modifier = Modifier.height(8.dp))
             Button(
                 onClick = onDismiss,
                 shape = RoundedCornerShape(10.dp),
@@ -558,9 +720,15 @@ private fun ReadmeSheetContent(
                     containerColor = MaterialTheme.colorScheme.primary,
                     contentColor = MaterialTheme.colorScheme.onPrimary
                 ),
-                modifier = Modifier.fillMaxWidth()
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .height(48.dp)
             ) {
-                Text("Đã hiểu")
+                Text(
+                    text = "Đã hiểu và Đóng",
+                    fontWeight = FontWeight.Bold,
+                    fontSize = 14.sp
+                )
             }
             Spacer(modifier = Modifier.height(20.dp))
         }
