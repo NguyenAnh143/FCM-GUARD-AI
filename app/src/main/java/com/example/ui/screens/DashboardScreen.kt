@@ -25,6 +25,7 @@ import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.Autorenew
 import androidx.compose.material.icons.filled.BatteryAlert
 import androidx.compose.material.icons.filled.Bolt
+import androidx.compose.material.icons.filled.CheckCircle
 import androidx.compose.material.icons.filled.CleaningServices
 import androidx.compose.material.icons.filled.DeleteSweep
 import androidx.compose.material.icons.filled.Chat
@@ -47,6 +48,7 @@ import androidx.compose.material3.Switch
 import androidx.compose.material3.SwitchDefaults
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
@@ -90,10 +92,21 @@ fun DashboardScreen(
     val scope = rememberCoroutineScope()
     var isRepairing by remember { mutableStateOf(false) }
 
-    val hasWriteSettings = remember(lastRepairTimestamp) { HyperOsUtils.canWriteSystemSettings(context) }
-    val isIgnoringBattery = remember(lastRepairTimestamp) { HyperOsUtils.isIgnoringBatteryOptimizations(context) }
+    val isScreenOn by appPreferences.isScreenOn.collectAsState()
+    val isDeviceSleeping by appPreferences.isDeviceSleeping.collectAsState()
+    val lastTriggerReason by appPreferences.lastTriggerReason.collectAsState()
+    val screenOffInterval by appPreferences.screenOffIntervalMinutes.collectAsState()
+    val screenOnInterval by appPreferences.screenOnIntervalMinutes.collectAsState()
+
+    var isIgnoringBattery by remember { mutableStateOf(HyperOsUtils.isIgnoringBatteryOptimizations(context)) }
+    var hasWriteSettings by remember { mutableStateOf(HyperOsUtils.canWriteSystemSettings(context)) }
 
     fun str(key: String): String = LanguageManager.getString(key, languageCode)
+
+    fun refreshPermissions() {
+        isIgnoringBattery = HyperOsUtils.isIgnoringBatteryOptimizations(context)
+        hasWriteSettings = HyperOsUtils.canWriteSystemSettings(context)
+    }
 
     LazyColumn(
         modifier = Modifier
@@ -106,7 +119,10 @@ fun DashboardScreen(
         item {
             MinimalHeroStatusCard(
                 isServiceRunning = isServiceRunning && isAutoGuard,
+                isScreenOn = isScreenOn,
+                isDeviceSleeping = isDeviceSleeping,
                 lastSocketStatus = lastSocketStatus,
+                lastTriggerReason = lastTriggerReason,
                 lastRepairTimestamp = lastRepairTimestamp,
                 lastLatencyMs = lastLatencyMs,
                 isRepairing = isRepairing,
@@ -124,13 +140,104 @@ fun DashboardScreen(
                             appPreferences.updateLastRepair(
                                 System.currentTimeMillis(),
                                 res.latencyMs,
-                                if (res.success) "OK" else "ERROR"
+                                if (res.success) "OK" else "ERROR",
+                                "MANUAL_REPAIR"
                             )
                             isRepairing = false
+                            refreshPermissions()
                         }
                     }
                 }
             )
+        }
+
+        // Battery Optimization Warning Card (If not yet ignored)
+        item {
+            OutlinedCard(
+                shape = RoundedCornerShape(16.dp),
+                colors = CardDefaults.outlinedCardColors(
+                    containerColor = if (isIgnoringBattery) MaterialTheme.colorScheme.surface else MaterialTheme.colorScheme.surfaceVariant
+                ),
+                border = CardDefaults.outlinedCardBorder().copy(
+                    brush = androidx.compose.ui.graphics.SolidColor(
+                        if (isIgnoringBattery) MaterialTheme.colorScheme.outline else MaterialTheme.colorScheme.primary
+                    )
+                ),
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .testTag("battery_optimization_alert_card")
+            ) {
+                Column(modifier = Modifier.padding(16.dp)) {
+                    Row(
+                        modifier = Modifier.fillMaxWidth(),
+                        verticalAlignment = Alignment.CenterVertically
+                    ) {
+                        Box(
+                            modifier = Modifier
+                                .size(38.dp)
+                                .clip(RoundedCornerShape(10.dp))
+                                .background(if (isIgnoringBattery) StatusGreen.copy(alpha = 0.15f) else MaterialTheme.colorScheme.primary),
+                            contentAlignment = Alignment.Center
+                        ) {
+                            Icon(
+                                imageVector = if (isIgnoringBattery) Icons.Default.CheckCircle else Icons.Default.BatteryAlert,
+                                contentDescription = null,
+                                tint = if (isIgnoringBattery) StatusGreen else MaterialTheme.colorScheme.onPrimary,
+                                modifier = Modifier.size(20.dp)
+                            )
+                        }
+                        Spacer(modifier = Modifier.width(12.dp))
+                        Column(modifier = Modifier.weight(1f)) {
+                            Text(
+                                text = if (isIgnoringBattery) "Đã bỏ qua tối ưu pin (Hoàn hảo)" else "Bỏ qua tối ưu pin (Bắt buộc)",
+                                style = MaterialTheme.typography.titleSmall,
+                                fontWeight = FontWeight.Bold,
+                                color = MaterialTheme.colorScheme.onSurface
+                            )
+                            Text(
+                                text = if (isIgnoringBattery) "Hệ thống sẽ không bao giờ ngắt FCM Guard khi chạy ngầm" else "Cần cấp để dịch vụ không bị dừng khi tắt màn hình lâu",
+                                style = MaterialTheme.typography.bodySmall,
+                                color = MaterialTheme.colorScheme.onSurfaceVariant,
+                                fontSize = 11.sp
+                            )
+                        }
+                    }
+
+                    if (!isIgnoringBattery) {
+                        Spacer(modifier = Modifier.height(12.dp))
+                        Button(
+                            onClick = {
+                                HyperOsUtils.openBatteryOptimizationSettings(context)
+                                refreshPermissions()
+                            },
+                            shape = RoundedCornerShape(10.dp),
+                            contentPadding = PaddingValues(horizontal = 14.dp, vertical = 10.dp),
+                            colors = ButtonDefaults.buttonColors(
+                                containerColor = MaterialTheme.colorScheme.primary,
+                                contentColor = MaterialTheme.colorScheme.onPrimary
+                            ),
+                            modifier = Modifier
+                                .fillMaxWidth()
+                                .defaultMinSize(minHeight = 46.dp)
+                                .testTag("request_ignore_battery_button")
+                        ) {
+                            Row(verticalAlignment = Alignment.CenterVertically) {
+                                Icon(
+                                    imageVector = Icons.Default.Bolt,
+                                    contentDescription = null,
+                                    modifier = Modifier.size(18.dp)
+                                )
+                                Spacer(modifier = Modifier.width(8.dp))
+                                Text(
+                                    text = "Bỏ qua tối ưu pin ngay",
+                                    fontWeight = FontWeight.Bold,
+                                    fontSize = 13.5.sp
+                                )
+                            }
+                        }
+                    }
+                }
+            }
         }
 
         // Feature: Clear All Data Battery & Performance
@@ -194,6 +301,7 @@ fun DashboardScreen(
 
                     Spacer(modifier = Modifier.height(14.dp))
 
+                    // Button with flexible height and no text clipping
                     Button(
                         onClick = {
                             val opened = HyperOsUtils.openBatteryAndPerformanceAppInfo(context)
@@ -206,14 +314,14 @@ fun DashboardScreen(
                             }
                         },
                         shape = RoundedCornerShape(12.dp),
-                        contentPadding = PaddingValues(horizontal = 16.dp, vertical = 14.dp),
+                        contentPadding = PaddingValues(horizontal = 14.dp, vertical = 12.dp),
                         colors = ButtonDefaults.buttonColors(
                             containerColor = MaterialTheme.colorScheme.primary,
                             contentColor = MaterialTheme.colorScheme.onPrimary
                         ),
                         modifier = Modifier
                             .fillMaxWidth()
-                            .defaultMinSize(minHeight = 58.dp)
+                            .defaultMinSize(minHeight = 54.dp)
                             .testTag("open_battery_performance_button")
                     ) {
                         Row(
@@ -228,7 +336,7 @@ fun DashboardScreen(
                             )
                             Spacer(modifier = Modifier.width(10.dp))
                             Column(
-                                modifier = Modifier.weight(1f, fill = false),
+                                modifier = Modifier.weight(1f),
                                 horizontalAlignment = Alignment.CenterHorizontally,
                                 verticalArrangement = Arrangement.Center
                             ) {
@@ -306,7 +414,7 @@ fun DashboardScreen(
                     Spacer(modifier = Modifier.height(10.dp))
 
                     Text(
-                        text = "Khi tắt màn hình lâu, HyperOS đưa thiết bị vào chế độ Ngủ sâu (Deep Sleep). FCM Guard đã kích hoạt AlarmManager chính xác để đánh thức socket MCS ngầm. Để Messenger nhận tin nhắn ngay lập tức, bạn bắt buộc cần 2 cài đặt sau:",
+                        text = "Khi tắt màn hình lâu, HyperOS đưa thiết bị vào chế độ Ngủ sâu (Deep Sleep). FCM Guard đã kích hoạt BroadcastReceiver và AlarmManager chính xác để đánh thức socket MCS ngầm. Để Messenger nhận tin nhắn ngay lập tức, bạn bắt buộc cần cấu hình:",
                         style = MaterialTheme.typography.bodySmall,
                         color = MaterialTheme.colorScheme.onSurfaceVariant,
                         lineHeight = 18.sp
@@ -316,8 +424,8 @@ fun DashboardScreen(
 
                     Text(
                         text = "• Bước 1: Mở Messenger → Bật 'Tự khởi chạy' và chọn Tiết kiệm pin là 'Không hạn chế'.\n" +
-                               "• Bước 2: Trong Cài đặt Pin HyperOS → Đặt 'Tắt dữ liệu di động khi thiết bị bị khóa' là 'Không bao giờ'.\n" +
-                               "• Bước 3: Mở Đa nhiệm (Recent apps) → Nhấn giữ ô Messenger → Bấm hình Ổ Khóa.",
+                                "• Bước 2: Trong Cài đặt Pin HyperOS → Đặt 'Tắt dữ liệu di động khi thiết bị bị khóa' là 'Không bao giờ'.\n" +
+                                "• Bước 3: Mở Đa nhiệm (Recent apps) → Nhấn giữ ô Messenger → Bấm hình Ổ Khóa.",
                         style = MaterialTheme.typography.bodySmall,
                         fontWeight = FontWeight.Medium,
                         color = MaterialTheme.colorScheme.onSurface,
@@ -388,7 +496,7 @@ fun DashboardScreen(
             }
         }
 
-        // Auto Guard & Notification Controls
+        // Auto Guard & Dual Keep-Alive Interval Controls
         item {
             OutlinedCard(
                 shape = RoundedCornerShape(16.dp),
@@ -409,7 +517,7 @@ fun DashboardScreen(
                     )
                     Spacer(modifier = Modifier.height(2.dp))
                     Text(
-                        text = str("switch_auto_guard_desc"),
+                        text = "Tự động lắng nghe tắt/bật màn hình, mở khóa và gửi heartbeat định kỳ",
                         style = MaterialTheme.typography.bodySmall,
                         color = MaterialTheme.colorScheme.onSurfaceVariant
                     )
@@ -440,30 +548,36 @@ fun DashboardScreen(
 
                     Spacer(modifier = Modifier.height(14.dp))
 
-                    // Backup Interval Selection
+                    // Screen-Off Heartbeat Interval (10m / 15m)
                     Text(
-                        text = str("backup_interval_title"),
+                        text = "Chu kỳ khi tắt màn hình (Thiết bị ngủ)",
                         style = MaterialTheme.typography.bodyMedium,
                         fontWeight = FontWeight.SemiBold,
                         color = MaterialTheme.colorScheme.onSurface
+                    )
+                    Text(
+                        text = "Duy trì socket khi tắt màn hình lâu để không bị trễ tin nhắn",
+                        style = MaterialTheme.typography.bodySmall,
+                        color = MaterialTheme.colorScheme.onSurfaceVariant,
+                        fontSize = 11.sp
                     )
                     Spacer(modifier = Modifier.height(6.dp))
                     Row(
                         modifier = Modifier.fillMaxWidth(),
                         horizontalArrangement = Arrangement.spacedBy(8.dp)
                     ) {
-                        listOf(10, 15, 30).forEach { mins ->
-                            val selected = backupInterval == mins
+                        listOf(5, 10, 15).forEach { mins ->
+                            val selected = screenOffInterval == mins
                             FilterChip(
                                 selected = selected,
                                 onClick = {
-                                    appPreferences.setBackupIntervalMinutes(mins)
+                                    appPreferences.setScreenOffIntervalMinutes(mins)
                                     FcmGuardService.updateConfig(context)
                                 },
                                 label = {
                                     Text(
-                                        text = "$mins ${if (mins == 30) "(Mặc định)" else "phút"}",
-                                        fontSize = 12.sp,
+                                        text = "$mins ${if (mins == 10) "phút (Tối ưu)" else "phút"}",
+                                        fontSize = 11.5.sp,
                                         fontWeight = if (selected) FontWeight.Bold else FontWeight.Normal
                                     )
                                 },
@@ -473,7 +587,47 @@ fun DashboardScreen(
                                 ),
                                 modifier = Modifier
                                     .weight(1f)
-                                    .testTag("interval_chip_$mins")
+                                    .testTag("screen_off_chip_$mins")
+                            )
+                        }
+                    }
+
+                    Spacer(modifier = Modifier.height(12.dp))
+
+                    // Screen-On Heartbeat Interval (15m / 30m / 60m)
+                    Text(
+                        text = "Chu kỳ khi màn hình sáng (Đang sử dụng)",
+                        style = MaterialTheme.typography.bodyMedium,
+                        fontWeight = FontWeight.SemiBold,
+                        color = MaterialTheme.colorScheme.onSurface
+                    )
+                    Spacer(modifier = Modifier.height(6.dp))
+                    Row(
+                        modifier = Modifier.fillMaxWidth(),
+                        horizontalArrangement = Arrangement.spacedBy(8.dp)
+                    ) {
+                        listOf(15, 30, 60).forEach { mins ->
+                            val selected = screenOnInterval == mins
+                            FilterChip(
+                                selected = selected,
+                                onClick = {
+                                    appPreferences.setScreenOnIntervalMinutes(mins)
+                                    FcmGuardService.updateConfig(context)
+                                },
+                                label = {
+                                    Text(
+                                        text = "$mins ${if (mins == 30) "phút (Chuẩn)" else "phút"}",
+                                        fontSize = 11.5.sp,
+                                        fontWeight = if (selected) FontWeight.Bold else FontWeight.Normal
+                                    )
+                                },
+                                colors = FilterChipDefaults.filterChipColors(
+                                    selectedContainerColor = MaterialTheme.colorScheme.primary,
+                                    selectedLabelColor = MaterialTheme.colorScheme.onPrimary
+                                ),
+                                modifier = Modifier
+                                    .weight(1f)
+                                    .testTag("screen_on_chip_$mins")
                             )
                         }
                     }
@@ -529,7 +683,10 @@ fun DashboardScreen(
                 subtitle = "Bật tự khởi chạy cho FCM Guard để dịch vụ luôn duy trì sau khi tắt ứng dụng",
                 icon = Icons.Default.Autorenew,
                 statusText = "Mở cài đặt",
-                onClick = { HyperOsUtils.openHyperOsAutostartSettings(context) }
+                onClick = {
+                    HyperOsUtils.openHyperOsAutostartSettings(context)
+                    refreshPermissions()
+                }
             )
         }
 
@@ -540,7 +697,10 @@ fun DashboardScreen(
                 icon = Icons.Default.BatteryAlert,
                 statusText = if (isIgnoringBattery) "Đã tối ưu" else "Cần cấp",
                 statusOk = isIgnoringBattery,
-                onClick = { HyperOsUtils.openBatteryOptimizationSettings(context) }
+                onClick = {
+                    HyperOsUtils.openBatteryOptimizationSettings(context)
+                    refreshPermissions()
+                }
             )
         }
 
@@ -551,7 +711,10 @@ fun DashboardScreen(
                 icon = Icons.Default.Settings,
                 statusText = if (hasWriteSettings) "Đã cấp" else "Cần cấp",
                 statusOk = hasWriteSettings,
-                onClick = { HyperOsUtils.openWriteSettingsPermission(context) }
+                onClick = {
+                    HyperOsUtils.openWriteSettingsPermission(context)
+                    refreshPermissions()
+                }
             )
         }
     }
@@ -560,7 +723,10 @@ fun DashboardScreen(
 @Composable
 private fun MinimalHeroStatusCard(
     isServiceRunning: Boolean,
+    isScreenOn: Boolean,
+    isDeviceSleeping: Boolean,
     lastSocketStatus: String,
+    lastTriggerReason: String,
     lastRepairTimestamp: Long,
     lastLatencyMs: Long,
     isRepairing: Boolean,
@@ -605,40 +771,99 @@ private fun MinimalHeroStatusCard(
                 color = MaterialTheme.colorScheme.onSurface
             )
 
-            Spacer(modifier = Modifier.height(6.dp))
+            Spacer(modifier = Modifier.height(8.dp))
 
-            // Socket Status Badge
+            // Socket Status Badge & Screen State Badge
             Row(
                 verticalAlignment = Alignment.CenterVertically,
-                horizontalArrangement = Arrangement.Center,
-                modifier = Modifier
-                    .clip(RoundedCornerShape(8.dp))
-                    .background(MaterialTheme.colorScheme.surfaceVariant)
-                    .padding(horizontal = 10.dp, vertical = 5.dp)
+                horizontalArrangement = Arrangement.spacedBy(8.dp)
             ) {
-                Box(
+                // Socket Badge
+                Row(
+                    verticalAlignment = Alignment.CenterVertically,
                     modifier = Modifier
-                        .size(8.dp)
-                        .clip(CircleShape)
-                        .background(if (lastSocketStatus == "OK") StatusGreen else StatusAmber)
-                )
-                Spacer(modifier = Modifier.width(6.dp))
-                Text(
-                    text = if (lastSocketStatus == "OK") str("socket_online") else str("socket_offline"),
-                    style = MaterialTheme.typography.bodySmall,
-                    color = MaterialTheme.colorScheme.onSurfaceVariant
-                )
+                        .clip(RoundedCornerShape(8.dp))
+                        .background(MaterialTheme.colorScheme.surfaceVariant)
+                        .padding(horizontal = 10.dp, vertical = 5.dp)
+                ) {
+                    Box(
+                        modifier = Modifier
+                            .size(8.dp)
+                            .clip(CircleShape)
+                            .background(
+                                when (lastSocketStatus) {
+                                    "OK" -> StatusGreen
+                                    "ERROR" -> StatusRed
+                                    else -> StatusAmber
+                                }
+                            )
+                    )
+                    Spacer(modifier = Modifier.width(6.dp))
+                    Text(
+                        text = when (lastSocketStatus) {
+                            "OK" -> str("socket_online")
+                            "ERROR" -> "Lỗi socket"
+                            "DISCONNECTED" -> "Mất mạng"
+                            else -> "Đang chờ"
+                        },
+                        style = MaterialTheme.typography.bodySmall,
+                        color = MaterialTheme.colorScheme.onSurfaceVariant,
+                        fontSize = 11.5.sp
+                    )
+                }
+
+                // Screen & Sleep State Badge
+                Row(
+                    verticalAlignment = Alignment.CenterVertically,
+                    modifier = Modifier
+                        .clip(RoundedCornerShape(8.dp))
+                        .background(MaterialTheme.colorScheme.surfaceVariant)
+                        .padding(horizontal = 10.dp, vertical = 5.dp)
+                ) {
+                    Box(
+                        modifier = Modifier
+                            .size(8.dp)
+                            .clip(CircleShape)
+                            .background(if (isScreenOn) StatusGreen else StatusAmber)
+                    )
+                    Spacer(modifier = Modifier.width(6.dp))
+                    Text(
+                        text = if (isScreenOn) "Màn hình: Sáng" else "Màn hình: Tắt (Ngủ)",
+                        style = MaterialTheme.typography.bodySmall,
+                        color = MaterialTheme.colorScheme.onSurfaceVariant,
+                        fontSize = 11.5.sp
+                    )
+                }
             }
 
             Spacer(modifier = Modifier.height(8.dp))
 
             if (lastRepairTimestamp > 0) {
                 val formattedTime = DateFormat.format("HH:mm:ss dd/MM", Date(lastRepairTimestamp)).toString()
+                val reasonDisplay = when {
+                    lastTriggerReason.startsWith("USER_PRESENT") -> "Mở khóa màn hình"
+                    lastTriggerReason.startsWith("SCREEN_ON") -> "Bật màn hình"
+                    lastTriggerReason.startsWith("SCREEN_OFF_ALARM") -> "Báo thức đánh thức CPU"
+                    lastTriggerReason.startsWith("PERIODIC_SCREEN_OFF") -> "Định kỳ khi tắt màn hình"
+                    lastTriggerReason.startsWith("PERIODIC_SCREEN_ON") -> "Định kỳ khi màn hình sáng"
+                    lastTriggerReason.startsWith("NETWORK_RESTORED") -> "Mạng phục hồi"
+                    lastTriggerReason.startsWith("MANUAL_REPAIR") -> "Thủ công"
+                    else -> lastTriggerReason
+                }
+
                 Text(
                     text = "Lần làm mới: $formattedTime • ${if (lastLatencyMs > 0) "${lastLatencyMs}ms" else "OK"}",
                     style = MaterialTheme.typography.labelSmall,
                     color = MaterialTheme.colorScheme.onSurfaceVariant
                 )
+                if (reasonDisplay.isNotEmpty()) {
+                    Text(
+                        text = "Lý do: $reasonDisplay",
+                        style = MaterialTheme.typography.labelSmall,
+                        color = MaterialTheme.colorScheme.primary,
+                        fontSize = 10.5.sp
+                    )
+                }
             }
 
             Spacer(modifier = Modifier.height(16.dp))
@@ -686,6 +911,7 @@ private fun MinimalHeroStatusCard(
         }
     }
 }
+
 
 @Composable
 private fun MinimalShortcutCard(

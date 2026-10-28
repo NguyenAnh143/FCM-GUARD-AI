@@ -41,7 +41,10 @@ class FcmGuardService : Service() {
     private var connectivityManager: ConnectivityManager? = null
     private var networkCallback: ConnectivityManager.NetworkCallback? = null
     private var screenReceiver: BroadcastReceiver? = null
-    private var periodicTimerJob: Job? = null
+
+    // Dual periodic timers
+    private var screenOnHeartbeatJob: Job? = null
+    private var screenOffHeartbeatJob: Job? = null
 
     override fun onCreate() {
         super.onCreate()
@@ -50,8 +53,18 @@ class FcmGuardService : Service() {
         createNotificationChannel()
 
         registerNetworkListener()
-        registerScreenReceiver()
-        startPeriodicTimer()
+        registerScreenStateReceiver()
+
+        // Start initial heartbeat timers based on current screen state
+        val powerManager = getSystemService(Context.POWER_SERVICE) as? android.os.PowerManager
+        val isScreenCurrentlyOn = powerManager?.isInteractive ?: true
+        appPreferences.updateScreenState(isScreenOn = isScreenCurrentlyOn, isDeviceSleeping = !isScreenCurrentlyOn)
+
+        if (isScreenCurrentlyOn) {
+            startScreenOnTimer()
+        } else {
+            startScreenOffTimer()
+        }
 
         isRunning = true
     }
@@ -69,7 +82,7 @@ class FcmGuardService : Service() {
             }
             ACTION_UPDATE_CONFIG -> {
                 updateNotification()
-                restartPeriodicTimer()
+                restartHeartbeatTimers()
             }
             ACTION_START -> {
                 startAsForeground()
@@ -135,11 +148,12 @@ class FcmGuardService : Service() {
             PendingIntent.FLAG_IMMUTABLE or PendingIntent.FLAG_UPDATE_CURRENT
         )
 
-        val interval = appPreferences.backupIntervalMinutes.value
+        val offInterval = appPreferences.screenOffIntervalMinutes.value
+        val onInterval = appPreferences.screenOnIntervalMinutes.value
 
         return NotificationCompat.Builder(this, CHANNEL_ID)
             .setContentTitle("FCM Guard — HyperOS Guardian")
-            .setContentText("$contentText (Dự phòng: ${interval}m)")
+            .setContentText("$contentText (Tắt màn hình: ${offInterval}m • Sáng: ${onInterval}m)")
             .setSmallIcon(R.drawable.ic_notification_guard)
             .setContentIntent(pendingOpenApp)
             .addAction(0, "Sửa lỗi ngay", pendingRepair)
@@ -181,7 +195,8 @@ class FcmGuardService : Service() {
                             appPreferences.updateLastRepair(
                                 System.currentTimeMillis(),
                                 result.latencyMs,
-                                if (result.success) "OK" else "ERROR"
+                                if (result.success) "OK" else "ERROR",
+                                "NETWORK_RESTORED"
                             )
                             updateNotification("Mạng phục hồi — Đã làm mới socket MCS")
                         }
@@ -194,7 +209,8 @@ class FcmGuardService : Service() {
                         appPreferences.updateLastRepair(
                             System.currentTimeMillis(),
                             -1L,
-                            "DISCONNECTED"
+                            "DISCONNECTED",
+                            "NETWORK_LOST"
                         )
                     }
                 }
@@ -206,7 +222,13 @@ class FcmGuardService : Service() {
         }
     }
 
-    private fun registerScreenReceiver() {
+    /**
+     * BroadcastReceiver for:
+     * - Intent.ACTION_SCREEN_ON
+     * - Intent.ACTION_SCREEN_OFF
+     * - Intent.ACTION_USER_PRESENT
+     */
+    private fun registerScreenStateReceiver() {
         try {
             screenReceiver = object : BroadcastReceiver() {
                 private var lastScreenOnTrigger = 0L
@@ -215,8 +237,11 @@ class FcmGuardService : Service() {
                     when (intent?.action) {
                         Intent.ACTION_SCREEN_ON -> {
                             val now = System.currentTimeMillis()
-                            // Throttle screen on heartbeats to avoid spamming (minimum 3 minutes apart)
-                            if (now - lastScreenOnTrigger > 3 * 60 * 1000L) {
+                            appPreferences.updateScreenState(isScreenOn = true, isDeviceSleeping = false)
+                            Log.d(TAG, "ACTION_SCREEN_ON detected: isScreenOn=true")
+
+                            // Throttle screen-on heartbeats (minimum 2 minutes apart to prevent spamming)
+                            if (now - lastScreenOnTrigger > 2 * 60 * 1000L) {
                                 lastScreenOnTrigger = now
                                 serviceScope.launch {
                                     val result = GmsHeartbeatManager.triggerHeartbeat(
@@ -227,78 +252,148 @@ class FcmGuardService : Service() {
                                     appPreferences.updateLastRepair(
                                         System.currentTimeMillis(),
                                         result.latencyMs,
-                                        if (result.success) "OK" else "ERROR"
+                                        if (result.success) "OK" else "ERROR",
+                                        "SCREEN_ON"
                                     )
                                 }
                             }
                         }
+
                         Intent.ACTION_SCREEN_OFF -> {
-                            // Device screen turned off: Prime exact alarm immediately to wake CPU during deep Doze
-                            if (appPreferences.isAutoGuardEnabled.value) {
-                                val interval = appPreferences.backupIntervalMinutes.value
-                                com.example.core.FcmAlarmScheduler.scheduleNextAlarm(applicationContext, interval)
-                                Log.d(TAG, "Screen OFF detected: Primed exact alarm keep-alive ($interval mins)")
+                            appPreferences.updateScreenState(isScreenOn = false, isDeviceSleeping = true)
+                            Log.d(TAG, "ACTION_SCREEN_OFF detected: device entering sleep mode")
+
+                            // Switch to screen-off timer & prime exact alarm keep-alive
+                            startScreenOffTimer()
+                        }
+
+                        Intent.ACTION_USER_PRESENT -> {
+                            appPreferences.updateScreenState(isScreenOn = true, isDeviceSleeping = false)
+                            Log.d(TAG, "ACTION_USER_PRESENT detected: User unlocked phone! Triggering immediate heartbeat")
+
+                            // User actively unlocked phone: trigger immediate heartbeat so pending messages deliver immediately!
+                            serviceScope.launch {
+                                val result = GmsHeartbeatManager.triggerHeartbeat(
+                                    applicationContext,
+                                    "USER_PRESENT",
+                                    appDatabase.heartbeatLogDao()
+                                )
+                                appPreferences.updateLastRepair(
+                                    System.currentTimeMillis(),
+                                    result.latencyMs,
+                                    if (result.success) "OK" else "ERROR",
+                                    "USER_PRESENT"
+                                )
                             }
+
+                            // Switch to screen-on periodic timer
+                            startScreenOnTimer()
                         }
                     }
                 }
             }
+
             val filter = IntentFilter().apply {
                 addAction(Intent.ACTION_SCREEN_ON)
                 addAction(Intent.ACTION_SCREEN_OFF)
+                addAction(Intent.ACTION_USER_PRESENT)
             }
             registerReceiver(screenReceiver, filter)
         } catch (e: Exception) {
-            Log.e(TAG, "Screen receiver registration failed: ${e.message}")
+            Log.e(TAG, "Screen state receiver registration failed: ${e.message}")
         }
     }
 
-    private fun startPeriodicTimer() {
-        periodicTimerJob?.cancel()
-        val minutes = appPreferences.backupIntervalMinutes.value
-        com.example.core.FcmAlarmScheduler.scheduleNextAlarm(applicationContext, minutes)
+    /**
+     * Periodic Timer when screen is ON
+     * Uses longer interval (e.g. 30 mins) to save resources
+     */
+    private fun startScreenOnTimer() {
+        screenOffHeartbeatJob?.cancel()
+        screenOnHeartbeatJob?.cancel()
 
-        periodicTimerJob = serviceScope.launch {
+        screenOnHeartbeatJob = serviceScope.launch {
             while (isActive) {
-                val delayMs = appPreferences.backupIntervalMinutes.value * 60 * 1000L
+                val intervalMins = appPreferences.screenOnIntervalMinutes.value
+                val delayMs = intervalMins * 60 * 1000L
                 delay(delayMs)
 
-                if (appPreferences.isAutoGuardEnabled.value) {
+                if (appPreferences.isAutoGuardEnabled.value && appPreferences.isScreenOn.value) {
                     val result = GmsHeartbeatManager.triggerHeartbeat(
                         applicationContext,
-                        "PERIODIC_TIMER_${appPreferences.backupIntervalMinutes.value}M",
+                        "PERIODIC_SCREEN_ON_${intervalMins}M",
                         appDatabase.heartbeatLogDao()
                     )
                     appPreferences.updateLastRepair(
                         System.currentTimeMillis(),
                         result.latencyMs,
-                        if (result.success) "OK" else "ERROR"
-                    )
-                    // Re-prime alarm to ensure continuity
-                    com.example.core.FcmAlarmScheduler.scheduleNextAlarm(
-                        applicationContext,
-                        appPreferences.backupIntervalMinutes.value
+                        if (result.success) "OK" else "ERROR",
+                        "PERIODIC_SCREEN_ON_${intervalMins}M"
                     )
                 }
             }
         }
     }
 
-    private fun restartPeriodicTimer() {
-        startPeriodicTimer()
+    /**
+     * Periodic Timer when screen is OFF (Device in standby / Deep Doze)
+     * Uses shorter interval (e.g. 10 or 15 mins) and primes AlarmManager with WakeLock
+     */
+    private fun startScreenOffTimer() {
+        screenOnHeartbeatJob?.cancel()
+        screenOffHeartbeatJob?.cancel()
+
+        val intervalMins = appPreferences.screenOffIntervalMinutes.value
+        // Prime exact alarm to wake CPU even when Android Deep Doze freezes coroutine delay
+        com.example.core.FcmAlarmScheduler.scheduleNextAlarm(applicationContext, intervalMins)
+
+        screenOffHeartbeatJob = serviceScope.launch {
+            while (isActive) {
+                val delayMs = appPreferences.screenOffIntervalMinutes.value * 60 * 1000L
+                delay(delayMs)
+
+                if (appPreferences.isAutoGuardEnabled.value && !appPreferences.isScreenOn.value) {
+                    val result = GmsHeartbeatManager.triggerHeartbeat(
+                        applicationContext,
+                        "PERIODIC_SCREEN_OFF_${appPreferences.screenOffIntervalMinutes.value}M",
+                        appDatabase.heartbeatLogDao()
+                    )
+                    appPreferences.updateLastRepair(
+                        System.currentTimeMillis(),
+                        result.latencyMs,
+                        if (result.success) "OK" else "ERROR",
+                        "PERIODIC_SCREEN_OFF_${appPreferences.screenOffIntervalMinutes.value}M"
+                    )
+                    // Re-prime alarm to ensure continuity during prolonged sleep
+                    com.example.core.FcmAlarmScheduler.scheduleNextAlarm(
+                        applicationContext,
+                        appPreferences.screenOffIntervalMinutes.value
+                    )
+                }
+            }
+        }
+    }
+
+    private fun restartHeartbeatTimers() {
+        if (appPreferences.isScreenOn.value) {
+            startScreenOnTimer()
+        } else {
+            startScreenOffTimer()
+        }
     }
 
     private fun triggerManualRepair() {
         serviceScope.launch {
             val result = GmsHeartbeatManager.triggerHeartbeat(
                 applicationContext,
-                "REPAIR_NOW",
+                "MANUAL_REPAIR",
                 appDatabase.heartbeatLogDao()
             )
             appPreferences.updateLastRepair(
                 System.currentTimeMillis(),
                 result.latencyMs,
-                if (result.success) "OK" else "ERROR"
+                if (result.success) "OK" else "ERROR",
+                "MANUAL_REPAIR"
             )
             updateNotification(
                 if (result.success) "Đã gửi MCS Heartbeat (${result.latencyMs}ms)"
@@ -309,7 +404,8 @@ class FcmGuardService : Service() {
 
     private fun stopForegroundService() {
         isRunning = false
-        periodicTimerJob?.cancel()
+        screenOnHeartbeatJob?.cancel()
+        screenOffHeartbeatJob?.cancel()
         com.example.core.FcmAlarmScheduler.cancelAlarm(applicationContext)
         try {
             networkCallback?.let { connectivityManager?.unregisterNetworkCallback(it) }

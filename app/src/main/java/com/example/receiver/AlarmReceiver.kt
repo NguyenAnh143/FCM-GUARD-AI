@@ -47,13 +47,14 @@ class AlarmReceiver : BroadcastReceiver() {
                         prefs.updateLastRepair(
                             System.currentTimeMillis(),
                             result.latencyMs,
-                            if (result.success) "OK" else "ERROR"
+                            if (result.success) "OK" else "ERROR",
+                            "SCREEN_OFF_ALARM"
                         )
 
-                        // Reschedule next alarm for perpetual keep-alive
-                        val interval = prefs.backupIntervalMinutes.value
+                        // Reschedule next alarm using screenOffIntervalMinutes
+                        val interval = prefs.screenOffIntervalMinutes.value
                         FcmAlarmScheduler.scheduleNextAlarm(context, interval)
-                        Log.d(TAG, "Alarm heartbeat finished: latency=${result.latencyMs}ms, status=${result.success}")
+                        Log.d(TAG, "Screen-off alarm heartbeat finished ($interval mins): latency=${result.latencyMs}ms, status=${result.success}")
                     }
                 } catch (e: Exception) {
                     Log.e(TAG, "Error in AlarmReceiver: ${e.message}")

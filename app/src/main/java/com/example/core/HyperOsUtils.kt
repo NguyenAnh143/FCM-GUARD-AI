@@ -114,9 +114,43 @@ object HyperOsUtils {
                 context.startActivity(intent)
                 return true
             } catch (ex: Exception) {
-                return false
+                return openAppDetailsSettings(context, context.packageName)
             }
         }
+    }
+
+    /**
+     * Opens Xiaomi / HyperOS Battery Saver settings directly to set 'No Restrictions' (Không hạn chế)
+     */
+    fun openHyperOsBatteryNoRestrictions(context: Context, targetPackage: String = context.packageName): Boolean {
+        val intents = listOf(
+            Intent().setComponent(
+                ComponentName(
+                    "com.miui.powerkeeper",
+                    "com.miui.powerkeeper.ui.HiddenAppsConfigActivity"
+                )
+            ).putExtra("package_name", targetPackage),
+            Intent().setComponent(
+                ComponentName(
+                    "com.miui.powerkeeper",
+                    "com.miui.powerkeeper.ui.PowerKeeperSettingsActivity"
+                )
+            ),
+            Intent().setComponent(
+                ComponentName(
+                    "com.miui.securitycenter",
+                    "com.miui.powercenter.PowerCenter"
+                )
+            )
+        )
+        for (intent in intents) {
+            try {
+                intent.addFlags(Intent.FLAG_ACTIVITY_NEW_TASK)
+                context.startActivity(intent)
+                return true
+            } catch (ignored: Exception) {}
+        }
+        return openAppDetailsSettings(context, targetPackage)
     }
 
     fun openWriteSettingsPermission(context: Context): Boolean {

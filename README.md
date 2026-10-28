@@ -6,7 +6,7 @@ Giải pháp tối ưu hóa và duy trì thông báo đẩy Firebase Cloud Messa
 
 ## 🌟 Thông tin phiên bản (Version Info)
 
-- Phiên bản ứng dụng: 1.3.0 (Mã phiên bản: Build 4)
+- Phiên bản ứng dụng: 1.4.0 (Mã phiên bản: Build 5)
 - Tương thích: Xiaomi HyperOS 1.0/2.0, MIUI 12/13/14, Android 7.0 đến Android 15/16.
 - Tập tin cài đặt: FCM_Guard.apk (nằm ngay tại thư mục gốc của dự án /).
 
@@ -86,6 +86,30 @@ File APK đã được biên dịch sẵn ngay tại thư mục gốc của dự
 - Tên file: FCM_Guard.apk (nằm ở thư mục gốc dự án)
 - Tải trực tiếp: Mở bảng File explorer bên trái → Click chuột phải hoặc nhấn vào dấu 3 chấm ⋮ cạnh file FCM_Guard.apk → Chọn Download.
 - Hoặc xuất file zip: Nhấn nút Export (góc trên bên phải) → Chọn Download as .zip file để tải về gói chứa sẵn file APK.
+
+## 🛠️ Đã cập nhật phiên bản 1.4.0 (Build 5) — Giám sát trạng thái Màn hình & Đánh thức Doze chuyên sâu
+
+### 1. Đăng ký Screen State Listener động (ACTION_SCREEN_ON, ACTION_SCREEN_OFF, ACTION_USER_PRESENT)
+- `ACTION_SCREEN_OFF`: Đánh dấu thiết bị đi vào chế độ ngủ sâu (`isScreenOn = false`, `isDeviceSleeping = true`), tự động kích hoạt bộ đếm heartbeat ngầm riêng biệt (10–15 phút) và cài đặt AlarmManager chính xác (`setExactAndAllowWhileIdle`) với WakeLock ngắn để duy trì socket liên tục.
+- `ACTION_SCREEN_ON`: Đánh dấu `isScreenOn = true`, gửi heartbeat ngay lập tức (với cơ chế chống spam tối thiểu 2 phút).
+- `ACTION_USER_PRESENT`: Khi người dùng mở khóa màn hình, FCM Guard lập tức gửi heartbeat ưu tiên cao (`FLAG_RECEIVER_FOREGROUND`) tới Google Play Services để giải phóng toàn bộ thông báo chờ ngay thời điểm người dùng bắt đầu dùng máy!
+
+### 2. Tách biệt bộ đếm chu kỳ (Dual Keep-Alive Timers)
+- **Khi tắt màn hình (Thiết bị ngủ sâu):** Chạy chu kỳ ngắn 10 phút (mặc định tối ưu) hoặc 15 phút, kết hợp AlarmManager đánh thức CPU.
+- **Khi màn hình sáng (Đang sử dụng):** Chạy chu kỳ dài 30 phút (tiết kiệm tài nguyên) hoặc 15/60 phút.
+
+### 3. Thực thi yêu cầu Bỏ qua tối ưu pin (ACTION_REQUEST_IGNORE_BATTERY_OPTIMIZATIONS)
+- Tự động kiểm tra `PowerManager.isIgnoringBatteryOptimizations()`.
+- Thêm thẻ cảnh báo trực quan và nút 1 chạm "Bỏ qua tối ưu pin ngay" gọi thẳng Intent hệ thống `Settings.ACTION_REQUEST_IGNORE_BATTERY_OPTIMIZATIONS`.
+
+### 4. Nâng cấp GmsHeartbeatManager (Retry & Timeout 5s & Ghi log lý do)
+- Thêm giới hạn timeout 5000ms cho phân giải DNS và kết nối TCP socket `mtalk.google.com:5228`.
+- Tự động thử lại (Retry 1–2 lần) nếu lần đầu thất bại trước khi báo lỗi.
+- Ghi nhận chi tiết trigger reason: `USER_PRESENT`, `SCREEN_ON`, `SCREEN_OFF_ALARM`, `PERIODIC_SCREEN_OFF_10M`, `PERIODIC_SCREEN_ON_30M`, `NETWORK_RESTORED`, `MANUAL_REPAIR`.
+
+### 5. Khắc phục hoàn toàn lỗi che chữ trên các nút bấm
+- Nút "Mở trang Thông tin ứng dụng để Xóa dữ liệu" của Pin & Hiệu suất: Mở rộng chiều cao linh hoạt, chữ xuống dòng hiển thị trọn vẹn 100%.
+- Nút "Chẩn đoán Dịch vụ Google Play (*#*#426#*#*)": Đệm viền rộng rãi, không bị cắt dòng `(*#*#426#*#*)`.
 
 ## 🛠️ Đã sửa lỗi và cập nhật phiên bản 1.3.0 (Build 4)
 

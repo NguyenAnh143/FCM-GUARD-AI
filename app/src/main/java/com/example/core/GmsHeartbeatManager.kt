@@ -48,8 +48,15 @@ object GmsHeartbeatManager {
             Log.w(TAG, "Broadcast send failed: ${e.message}")
         }
 
-        // 2. Test actual TCP connection & latency to mtalk.google.com:5228
-        val testResult = testSocketConnection(reason)
+        // 2. Test actual TCP connection & latency to mtalk.google.com:5228 with retry (max 2 retries)
+        var testResult = testSocketConnection(reason)
+        var retryCount = 0
+        while (!testResult.success && retryCount < 2) {
+            retryCount++
+            Log.d(TAG, "Socket attempt failed, retrying ($retryCount/2) for trigger: $reason...")
+            kotlinx.coroutines.delay(400L * retryCount)
+            testResult = testSocketConnection("$reason (retry $retryCount)")
+        }
 
         // 3. Persist to history log
         if (logDao != null) {
@@ -61,7 +68,7 @@ object GmsHeartbeatManager {
                         latencyMs = testResult.latencyMs,
                         serverIp = testResult.serverIp,
                         triggerReason = reason,
-                        details = testResult.message
+                        details = if (retryCount > 0) "${testResult.message} [Đã thử lại $retryCount lần]" else testResult.message
                     )
                 )
             } catch (e: Exception) {
@@ -89,6 +96,7 @@ object GmsHeartbeatManager {
             val tcpStart = System.currentTimeMillis()
             val socket = Socket()
             val socketAddress = InetSocketAddress(inetAddress, GOOGLE_MTALK_PORT)
+            // 5000ms timeout
             socket.connect(socketAddress, 5000)
             tcpLatency = System.currentTimeMillis() - tcpStart
             socket.close()

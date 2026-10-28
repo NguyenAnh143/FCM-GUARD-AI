@@ -204,10 +204,10 @@ fun DiagnosticsScreen(
                     OutlinedButton(
                         onClick = { HyperOsUtils.openGcmDiagnostics(context) },
                         shape = RoundedCornerShape(12.dp),
-                        contentPadding = PaddingValues(horizontal = 16.dp, vertical = 14.dp),
+                        contentPadding = PaddingValues(horizontal = 14.dp, vertical = 12.dp),
                         modifier = Modifier
                             .fillMaxWidth()
-                            .defaultMinSize(minHeight = 58.dp)
+                            .defaultMinSize(minHeight = 56.dp)
                             .testTag("gcm_diag_shortcut_button")
                     ) {
                         Row(
@@ -222,7 +222,7 @@ fun DiagnosticsScreen(
                             )
                             Spacer(modifier = Modifier.width(10.dp))
                             Column(
-                                modifier = Modifier.weight(1f, fill = false),
+                                modifier = Modifier.weight(1f),
                                 horizontalAlignment = Alignment.CenterHorizontally,
                                 verticalArrangement = Arrangement.Center
                             ) {

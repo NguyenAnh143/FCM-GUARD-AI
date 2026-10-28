@@ -139,7 +139,7 @@ fun SettingsGuideScreen(
             sheetState = rememberModalBottomSheetState(skipPartiallyExpanded = true)
         ) {
             ReadmeSheetContent(
-                version = "1.3.0",
+                version = "1.4.0",
                 onDismiss = { showReadmeSheet = false }
             )
         }
@@ -421,7 +421,7 @@ fun SettingsGuideScreen(
                     )
                     Spacer(modifier = Modifier.height(2.dp))
                     Text(
-                        text = "Phiên bản 1.3.0 (Build 4) • Xiaomi HyperOS & Android",
+                        text = "Phiên bản 1.4.0 (Build 5) • Xiaomi HyperOS & Android",
                         style = MaterialTheme.typography.bodySmall,
                         color = MaterialTheme.colorScheme.onSurfaceVariant
                     )
@@ -524,7 +524,7 @@ private fun ReadmeSheetContent(
                 color = MaterialTheme.colorScheme.onSurface
             )
             Text(
-                text = "Phiên bản $version (Build 4) • Xiaomi HyperOS & Android",
+                text = "Phiên bản $version (Build 5) • Xiaomi HyperOS & Android",
                 style = MaterialTheme.typography.bodySmall,
                 color = MaterialTheme.colorScheme.onSurfaceVariant
             )
@@ -559,7 +559,7 @@ private fun ReadmeSheetContent(
                     Text(
                         text = "• File APK: FCM_Guard.apk\n" +
                                "• Vị trí: Đặt trực tiếp tại thư mục gốc của dự án (/\n" +
-                               "• Phiên bản: $version (Build 4)\n" +
+                               "• Phiên bản: $version (Build 5)\n" +
                                "• Cách tải: Click chuột phải vào file FCM_Guard.apk trong cây thư mục bên trái → Chọn 'Download' (hoặc xuất file ZIP dự án).",
                         style = MaterialTheme.typography.bodySmall,
                         color = MaterialTheme.colorScheme.onSurface,
