@@ -37,6 +37,7 @@ class ExampleRobolectricTest {
         val context = ApplicationProvider.getApplicationContext<Context>()
         val prefs = AppPreferences(context)
         assertTrue(prefs.isAutoGuardEnabled.value)
-        assertEquals(30, prefs.backupIntervalMinutes.value)
+        assertEquals(10, prefs.screenOffIntervalMinutes.value)
+        assertEquals(30, prefs.screenOnIntervalMinutes.value)
     }
 }

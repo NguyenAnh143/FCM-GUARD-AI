@@ -66,6 +66,70 @@ object HyperOsUtils {
         return powerManager.isIgnoringBatteryOptimizations(context.packageName)
     }
 
+    /**
+     * Checks if the app has permission to schedule exact alarms (Android 12+ / API 31+)
+     */
+    fun canScheduleExactAlarms(context: Context): Boolean {
+        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.S) {
+            val alarmManager = context.getSystemService(Context.ALARM_SERVICE) as? android.app.AlarmManager
+                ?: return false
+            return alarmManager.canScheduleExactAlarms()
+        }
+        return true
+    }
+
+    /**
+     * Runtime request to ignore battery optimization using ACTION_REQUEST_IGNORE_BATTERY_OPTIMIZATIONS
+     * Falls back to general battery saver settings if direct package intent is restricted by OEM.
+     */
+    fun requestIgnoreBatteryOptimization(context: Context): Boolean {
+        val powerManager = context.getSystemService(Context.POWER_SERVICE) as? PowerManager
+        if (powerManager != null && powerManager.isIgnoringBatteryOptimizations(context.packageName)) {
+            return true
+        }
+        return try {
+            val intent = Intent(Settings.ACTION_REQUEST_IGNORE_BATTERY_OPTIMIZATIONS).apply {
+                data = Uri.parse("package:${context.packageName}")
+                addFlags(Intent.FLAG_ACTIVITY_NEW_TASK)
+            }
+            context.startActivity(intent)
+            true
+        } catch (e: Exception) {
+            try {
+                val intent = Intent(Settings.ACTION_IGNORE_BATTERY_OPTIMIZATION_SETTINGS).apply {
+                    addFlags(Intent.FLAG_ACTIVITY_NEW_TASK)
+                }
+                context.startActivity(intent)
+                true
+            } catch (ex: Exception) {
+                openAppDetailsSettings(context, context.packageName)
+            }
+        }
+    }
+
+    /**
+     * Runtime request for SCHEDULE_EXACT_ALARM permission on Android 12+ (API 31+)
+     */
+    fun requestScheduleExactAlarm(context: Context): Boolean {
+        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.S) {
+            val alarmManager = context.getSystemService(Context.ALARM_SERVICE) as? android.app.AlarmManager
+            if (alarmManager != null && alarmManager.canScheduleExactAlarms()) {
+                return true
+            }
+            return try {
+                val intent = Intent(Settings.ACTION_REQUEST_SCHEDULE_EXACT_ALARM).apply {
+                    data = Uri.parse("package:${context.packageName}")
+                    addFlags(Intent.FLAG_ACTIVITY_NEW_TASK)
+                }
+                context.startActivity(intent)
+                true
+            } catch (e: Exception) {
+                openAppDetailsSettings(context, context.packageName)
+            }
+        }
+        return true
+    }
+
     fun canWriteSystemSettings(context: Context): Boolean {
         return Settings.System.canWrite(context)
     }
@@ -99,24 +163,7 @@ object HyperOsUtils {
     }
 
     fun openBatteryOptimizationSettings(context: Context): Boolean {
-        try {
-            val intent = Intent(Settings.ACTION_REQUEST_IGNORE_BATTERY_OPTIMIZATIONS).apply {
-                data = Uri.parse("package:${context.packageName}")
-                addFlags(Intent.FLAG_ACTIVITY_NEW_TASK)
-            }
-            context.startActivity(intent)
-            return true
-        } catch (e: Exception) {
-            try {
-                val intent = Intent(Settings.ACTION_IGNORE_BATTERY_OPTIMIZATION_SETTINGS).apply {
-                    addFlags(Intent.FLAG_ACTIVITY_NEW_TASK)
-                }
-                context.startActivity(intent)
-                return true
-            } catch (ex: Exception) {
-                return openAppDetailsSettings(context, context.packageName)
-            }
-        }
+        return requestIgnoreBatteryOptimization(context)
     }
 
     /**

@@ -51,6 +51,18 @@ class AppPreferences(context: Context) {
     private val _isDeviceSleeping = MutableStateFlow(false)
     val isDeviceSleeping: StateFlow<Boolean> = _isDeviceSleeping.asStateFlow()
 
+    // Live system permissions
+    private val _isBatteryOptimizationIgnored = MutableStateFlow(false)
+    val isBatteryOptimizationIgnored: StateFlow<Boolean> = _isBatteryOptimizationIgnored.asStateFlow()
+
+    private val _canScheduleExactAlarms = MutableStateFlow(true)
+    val canScheduleExactAlarms: StateFlow<Boolean> = _canScheduleExactAlarms.asStateFlow()
+
+    fun updateSystemPermissions(isBatteryIgnored: Boolean, canExactAlarm: Boolean) {
+        _isBatteryOptimizationIgnored.value = isBatteryIgnored
+        _canScheduleExactAlarms.value = canExactAlarm
+    }
+
     fun setAutoGuardEnabled(enabled: Boolean) {
         prefs.edit().putBoolean(KEY_AUTO_GUARD, enabled).apply()
         _isAutoGuardEnabled.value = enabled

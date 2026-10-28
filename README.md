@@ -6,7 +6,7 @@ Giải pháp tối ưu hóa và duy trì thông báo đẩy Firebase Cloud Messa
 
 ## 🌟 Thông tin phiên bản (Version Info)
 
-- Phiên bản ứng dụng: 1.4.0 (Mã phiên bản: Build 5)
+- Phiên bản ứng dụng: 1.5.0 (Mã phiên bản: Build 6)
 - Tương thích: Xiaomi HyperOS 1.0/2.0, MIUI 12/13/14, Android 7.0 đến Android 15/16.
 - Tập tin cài đặt: FCM_Guard.apk (nằm ngay tại thư mục gốc của dự án /).
 
@@ -86,6 +86,24 @@ File APK đã được biên dịch sẵn ngay tại thư mục gốc của dự
 - Tên file: FCM_Guard.apk (nằm ở thư mục gốc dự án)
 - Tải trực tiếp: Mở bảng File explorer bên trái → Click chuột phải hoặc nhấn vào dấu 3 chấm ⋮ cạnh file FCM_Guard.apk → Chọn Download.
 - Hoặc xuất file zip: Nhấn nút Export (góc trên bên phải) → Chọn Download as .zip file để tải về gói chứa sẵn file APK.
+
+## 🛠️ Đã cập nhật phiên bản 1.5.0 (Build 6) — Runtime Request Bỏ qua tối ưu pin & Báo thức chính xác
+
+### 1. Runtime Request Bỏ qua tối ưu pin tự động & 1-chạm
+- Tự động gọi `PowerManager.isIgnoringBatteryOptimizations(packageName)` khi ứng dụng khởi chạy hoặc phục hồi (`onResume`).
+- Nếu chưa bỏ qua, tự động kích hoạt `Settings.ACTION_REQUEST_IGNORE_BATTERY_OPTIMIZATIONS` kèm fallback mượt mà nếu ROM OEM giới hạn.
+- Thêm nút "Bỏ qua tối ưu pin ngay" nổi bật tại Bảng điều khiển (Dashboard) và Cài đặt (Settings) để người dùng kích hoạt bất cứ lúc nào chỉ với 1 chạm.
+
+### 2. Runtime Check & Request Quyền Báo thức chính xác (SCHEDULE_EXACT_ALARM) cho Android 12+
+- Kiểm tra `AlarmManager.canScheduleExactAlarms()` trên Android 12+ (API 31+).
+- Cung cấp luồng kích hoạt trực tiếp `Settings.ACTION_REQUEST_SCHEDULE_EXACT_ALARM` để đảm bảo cơ chế đánh thức CPU định kỳ khi màn hình tắt (`setExactAndAllowWhileIdle`) hoạt động với độ chuẩn xác 100%.
+
+### 3. Reactive Lifecycle Observer & Trạng thái quyền thời gian thực
+- Tích hợp `LifecycleEventObserver` lắng nghe sự kiện `ON_RESUME`. Khi người dùng rời ứng dụng sang Cài đặt hệ thống để cấp quyền và quay lại, toàn bộ giao diện (Bảng điều khiển & Cài đặt) lập tức cập nhật trạng thái mới nhất sang màu xanh "Đã sẵn sàng" mà không cần tắt/mở lại app.
+
+### 4. Giữ nguyên toàn bộ cơ chế bảo vệ chuyên sâu
+- Giữ vững toàn bộ logic lắng nghe sự kiện màn hình tắt (`ACTION_SCREEN_OFF`), màn hình bật (`ACTION_SCREEN_ON`), mở khóa thiết bị (`ACTION_USER_PRESENT`).
+- Bộ đếm kép Dual Keep-Alive (10 phút khi tắt màn hình, 30 phút khi bật màn hình) và giữ kết nối socket `mtalk.google.com:5228`.
 
 ## 🛠️ Đã cập nhật phiên bản 1.4.0 (Build 5) — Giám sát trạng thái Màn hình & Đánh thức Doze chuyên sâu
 

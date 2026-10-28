@@ -22,6 +22,7 @@ import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
+import androidx.compose.material.icons.filled.Alarm
 import androidx.compose.material.icons.filled.Autorenew
 import androidx.compose.material.icons.filled.BatteryAlert
 import androidx.compose.material.icons.filled.Bolt
@@ -48,6 +49,7 @@ import androidx.compose.material3.Switch
 import androidx.compose.material3.SwitchDefaults
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.DisposableEffect
 import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
@@ -63,6 +65,9 @@ import androidx.compose.ui.platform.testTag
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
+import androidx.lifecycle.Lifecycle
+import androidx.lifecycle.LifecycleEventObserver
+import androidx.lifecycle.compose.LocalLifecycleOwner
 import com.example.core.GmsHeartbeatManager
 import com.example.core.HyperOsUtils
 import com.example.data.db.AppDatabase
@@ -98,14 +103,33 @@ fun DashboardScreen(
     val screenOffInterval by appPreferences.screenOffIntervalMinutes.collectAsState()
     val screenOnInterval by appPreferences.screenOnIntervalMinutes.collectAsState()
 
+    val lifecycleOwner = LocalLifecycleOwner.current
+    val isBatteryOptimizationIgnoredPref by appPreferences.isBatteryOptimizationIgnored.collectAsState()
+    val canScheduleExactAlarmsPref by appPreferences.canScheduleExactAlarms.collectAsState()
+
     var isIgnoringBattery by remember { mutableStateOf(HyperOsUtils.isIgnoringBatteryOptimizations(context)) }
+    var canExactAlarm by remember { mutableStateOf(HyperOsUtils.canScheduleExactAlarms(context)) }
     var hasWriteSettings by remember { mutableStateOf(HyperOsUtils.canWriteSystemSettings(context)) }
 
     fun str(key: String): String = LanguageManager.getString(key, languageCode)
 
     fun refreshPermissions() {
         isIgnoringBattery = HyperOsUtils.isIgnoringBatteryOptimizations(context)
+        canExactAlarm = HyperOsUtils.canScheduleExactAlarms(context)
         hasWriteSettings = HyperOsUtils.canWriteSystemSettings(context)
+        appPreferences.updateSystemPermissions(isIgnoringBattery, canExactAlarm)
+    }
+
+    DisposableEffect(lifecycleOwner) {
+        val observer = LifecycleEventObserver { _, event ->
+            if (event == Lifecycle.Event.ON_RESUME) {
+                refreshPermissions()
+            }
+        }
+        lifecycleOwner.lifecycle.addObserver(observer)
+        onDispose {
+            lifecycleOwner.lifecycle.removeObserver(observer)
+        }
     }
 
     LazyColumn(
@@ -207,7 +231,7 @@ fun DashboardScreen(
                         Spacer(modifier = Modifier.height(12.dp))
                         Button(
                             onClick = {
-                                HyperOsUtils.openBatteryOptimizationSettings(context)
+                                HyperOsUtils.requestIgnoreBatteryOptimization(context)
                                 refreshPermissions()
                             },
                             shape = RoundedCornerShape(10.dp),
@@ -230,6 +254,93 @@ fun DashboardScreen(
                                 Spacer(modifier = Modifier.width(8.dp))
                                 Text(
                                     text = "Bỏ qua tối ưu pin ngay",
+                                    fontWeight = FontWeight.Bold,
+                                    fontSize = 13.5.sp
+                                )
+                            }
+                        }
+                    }
+                }
+            }
+        }
+
+        // Exact Alarm Permission Card (Android 12+) if not yet granted
+        if (!canExactAlarm) {
+            item {
+                OutlinedCard(
+                    shape = RoundedCornerShape(16.dp),
+                    colors = CardDefaults.outlinedCardColors(
+                        containerColor = MaterialTheme.colorScheme.surfaceVariant
+                    ),
+                    border = CardDefaults.outlinedCardBorder().copy(
+                        brush = androidx.compose.ui.graphics.SolidColor(MaterialTheme.colorScheme.primary)
+                    ),
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .testTag("exact_alarm_alert_card")
+                ) {
+                    Column(modifier = Modifier.padding(16.dp)) {
+                        Row(
+                            modifier = Modifier.fillMaxWidth(),
+                            verticalAlignment = Alignment.CenterVertically
+                        ) {
+                            Box(
+                                modifier = Modifier
+                                    .size(38.dp)
+                                    .clip(RoundedCornerShape(10.dp))
+                                    .background(MaterialTheme.colorScheme.primary),
+                                contentAlignment = Alignment.Center
+                            ) {
+                                Icon(
+                                    imageVector = Icons.Default.Alarm,
+                                    contentDescription = null,
+                                    tint = MaterialTheme.colorScheme.onPrimary,
+                                    modifier = Modifier.size(20.dp)
+                                )
+                            }
+                            Spacer(modifier = Modifier.width(12.dp))
+                            Column(modifier = Modifier.weight(1f)) {
+                                Text(
+                                    text = "Báo thức chính xác (Android 12+)",
+                                    style = MaterialTheme.typography.titleSmall,
+                                    fontWeight = FontWeight.Bold,
+                                    color = MaterialTheme.colorScheme.onSurface
+                                )
+                                Text(
+                                    text = "Cần quyền để gửi heartbeat chuẩn xác từng phút khi tắt màn hình lâu",
+                                    style = MaterialTheme.typography.bodySmall,
+                                    color = MaterialTheme.colorScheme.onSurfaceVariant,
+                                    fontSize = 11.sp
+                                )
+                            }
+                        }
+
+                        Spacer(modifier = Modifier.height(12.dp))
+                        Button(
+                            onClick = {
+                                HyperOsUtils.requestScheduleExactAlarm(context)
+                                refreshPermissions()
+                            },
+                            shape = RoundedCornerShape(10.dp),
+                            contentPadding = PaddingValues(horizontal = 14.dp, vertical = 10.dp),
+                            colors = ButtonDefaults.buttonColors(
+                                containerColor = MaterialTheme.colorScheme.primary,
+                                contentColor = MaterialTheme.colorScheme.onPrimary
+                            ),
+                            modifier = Modifier
+                                .fillMaxWidth()
+                                .defaultMinSize(minHeight = 46.dp)
+                                .testTag("request_exact_alarm_button")
+                        ) {
+                            Row(verticalAlignment = Alignment.CenterVertically) {
+                                Icon(
+                                    imageVector = Icons.Default.Alarm,
+                                    contentDescription = null,
+                                    modifier = Modifier.size(18.dp)
+                                )
+                                Spacer(modifier = Modifier.width(8.dp))
+                                Text(
+                                    text = "Cấp quyền Báo thức chính xác",
                                     fontWeight = FontWeight.Bold,
                                     fontSize = 13.5.sp
                                 )
