@@ -8,41 +8,45 @@ Giải pháp tối ưu hóa và duy trì thông báo đẩy Firebase Cloud Messa
 
 ## 🌟 Thông tin phiên bản (Version Info)
 
-- **Phiên bản ứng dụng**: 1.6.1 (Mã phiên bản: Build 8)
-- **Tương thích**: Xiaomi HyperOS 1.0/2.0 (China & Global ROM), MIUI 12/13/14, Android 7.0 đến Android 15/16.
+- **Phiên bản ứng dụng**: 1.6.2 (Mã phiên bản: Build 9)
+- **Tương thích**: Xiaomi HyperOS 1.0/2.0 (China & Global ROM), MIUI 12/13/14, Android 5.0 (minSdk 21) đến Android 15/16.
 - **Tập tin cài đặt**: `FCM_Guard.apk` (nằm ngay tại thư mục gốc của dự án `/`).
-- **targetSdk**: 35 (Android 15 tiêu chuẩn, hỗ trợ cập nhật đè trực tiếp không lỗi -26, giao diện tràn viền toàn màn hình không bị vệt đen).
+- **targetSdk**: 22 (Bắt buộc để ghi được key vendor-private `MILLET_NO_RESTRICT_APP` trên HyperOS qua quyền Sửa đổi cài đặt hệ thống).
+
+> ⚠️ **Lưu ý quan trọng khi cài đặt v1.6.2**: Nếu thiết bị của bạn đang cài bản 1.6.1 (targetSdk 35), Android sẽ chặn cập nhật đè do cơ chế hạ cấp quyền (`INSTALL_FAILED_PERMISSION_MODEL_DOWNGRADE -26`). Bạn vui lòng **gỡ bỏ bản cũ (1.6.1)** trước, sau đó cài đặt file `FCM_Guard.apk` của bản 1.6.2.
 
 ---
 
-## ⚡ Đột phá kỹ thuật v1.6.1: Sửa triệt để lỗi mất thông báo & Khắc phục lỗi cài đặt -26
+## ⚡ Chi tiết cập nhật v1.6.2: Khôi phục targetSdk 22 & Sửa triệt để lỗi ghi Whitelist
 
-### 1. Cơ chế Whitelist HyperOS (`Settings.System.MILLET_NO_RESTRICT_APP`)
-- **Nguyên nhân gốc**: Trên Xiaomi HyperOS (đặc biệt là bản nội địa Trung Quốc - China ROM), cơ chế quản lý tiến trình ngầm **Greezer** và **PowerKeeper** sẽ tự động đóng băng Google Play Services (GMS) và cắt socket MCS khi gói `com.google.android.gms` không có trong cài đặt hệ thống:
-  ```
-  Settings.System.MILLET_NO_RESTRICT_APP   (danh sách các package được miễn đóng băng, cách nhau bằng dấu phẩy)
-  ```
-- **Giải pháp của FCM Guard**:
-  - `GmsWhitelistManager` đọc giá trị hiện tại của `MILLET_NO_RESTRICT_APP`.
-  - Tách mảng, kiểm tra sự hiện diện của `com.google.android.gms`.
-  - Giữ nguyên các gói hiện có của hệ thống và bổ sung `com.google.android.gms` vào cuối danh sách.
-  - Ghi đè bằng `Settings.System.putString` và đọc lại để xác nhận trạng thái thành công.
+### 1. Quay lại targetSdk 22 để ghi thành công `MILLET_NO_RESTRICT_APP`
+- **Nguyên nhân cốt lõi**: Trên targetSdk 35, lời gọi `Settings.System.putString("MILLET_NO_RESTRICT_APP", ...)` bị hệ điều hành Android chặn vì đây là key vendor-private không thuộc danh mục công khai của AOSP, dẫn đến app báo lỗi `KEY_UNSUPPORTED` hoặc `WRITE_FAILED` và GMS không thể thêm vào whitelist.
+- **Giải pháp chuẩn từ repo gốc ReedGAOOO/FCMGuard-HyperOS**: Sử dụng `targetSdk = 22` kết hợp `minSdk = 21` để đi qua đường tương thích cũ (legacy target permission model), cho phép quyền "Sửa đổi cài đặt hệ thống" (`WRITE_SETTINGS`) ghi trực tiếp vào `Settings.System.MILLET_NO_RESTRICT_APP`.
 
-### 2. Sửa lỗi cài đặt đè (-26 Can't downgrade permissions) & Tràn viền giao diện
-- **Nguyên nhân lỗi -26**: Phiên bản trước hạ targetSdk xuống 22 khiến hệ điều hành Android chặn không cho cập nhật đè lên ứng dụng cũ (lỗi `INSTALL_FAILED_PERMISSION_MODEL_DOWNGRADE -26`), đồng thời trên các máy Android 10+ bị hệ thống ép hiển thị thanh đen letterbox giả lập 3-button bar ở đáy màn hình.
-- **Khắc phục v1.6.1**: Trả về `targetSdk = 35` chuẩn Android 15, cho phép người dùng bấm cài đặt cập nhật trực tiếp đè lên phiên bản cũ ngay lập tức mà không cần gỡ ứng dụng, đồng thời loại bỏ hoàn toàn vệt đen ở thanh điều hướng, đưa toàn bộ giao diện về chuẩn Edge-to-Edge sắc nét.
+### 2. Khắc phục triệt để lỗi dải đen (Letterbox) cuối màn hình của targetSdk 22
+- Với targetSdk cũ (22), Android thường áp đặt giới hạn tỷ lệ khung hình màn hình 16:9 hoặc ép hiển thị thanh đen giả lập ở đáy.
+- FCM Guard 1.6.2 đã khắc phục hoàn toàn bằng cách cấu hình trực tiếp trong `AndroidManifest.xml`:
+  - `android:resizeableActivity="true"` (hỗ trợ hiển thị tỷ lệ tự do không giới hạn).
+  - `<meta-data android:name="android.max_aspect_ratio" android:value="3.0" />` (cho phép kéo dài toàn bộ màn hình đến tỷ lệ 3:1 tràn viền).
+  - Khôi phục `.windowInsetsPadding(WindowInsets.navigationBars)` tại `NavigationBar` trong `FcmGuardApp.kt` để thanh điều hướng ôm sát cạnh dưới màn hình chuẩn mực.
 
-### 3. Giám sát thời gian thực (ContentObserver Watchdog)
+### 3. Tương thích thư viện với `<uses-sdk tools:overrideLibrary="...">`
+- Khôi phục thẻ overrideLibrary trong Manifest cho `androidx.core.ktx` và `androidx.core` để dự án tương thích hoàn hảo giữa `minSdk = 21`, `targetSdk = 22` và bộ công cụ Jetpack Compose hiện đại.
+
+### 4. Thông báo chẩn đoán chính xác hơn
+- Khi gặp lỗi `WRITE_FAILED` hoặc `KEY_UNSUPPORTED`, app không còn đưa ra nhận định chung chung "thiết bị không hỗ trợ", mà hướng dẫn rõ: *"Ghi bị từ chối, kiểm tra targetSdk phải là 22 và quyền Sửa đổi cài đặt hệ thống!"*.
+
+### 5. Giám sát thời gian thực (ContentObserver Watchdog)
 - HyperOS thường xuyên tự động dựng lại cài đặt `MILLET_NO_RESTRICT_APP` trong nền và xóa GMS ra ngoài.
 - `FcmGuardService` đăng ký một `ContentObserver` lắng nghe URI `Settings.System.getUriFor("MILLET_NO_RESTRICT_APP")` với cơ chế debounce ~1s.
 - Bất cứ khi nào HyperOS xóa `com.google.android.gms`, FCM Guard sẽ phát hiện ngay lập tức và ghi trả lại GMS vào Whitelist.
 
-### 4. Tối ưu hóa chu kỳ báo thức & Không hao pin khi đang sử dụng máy
+### 6. Tối ưu hóa chu kỳ báo thức & Không hao pin khi đang sử dụng máy
 - **Hủy báo thức khi mở máy**: Đăng ký `BroadcastReceiver` lắng nghe `ACTION_SCREEN_ON` và `ACTION_USER_PRESENT`. Ngay khi màn hình bật hoặc người dùng mở khóa, toàn bộ chu kỳ báo thức CPU (`AlarmManager`) lập tức bị hủy để tiết kiệm pin tối đa.
 - **Chỉ kích hoạt báo thức khi màn hình tắt**: Khi màn hình tắt (`ACTION_SCREEN_OFF`), ứng dụng khởi động chu kỳ báo thức ngắn để đánh thức CPU, kiểm tra whitelist và duy trì socket.
 - **Kiểm tra trạng thái thiết bị trong `AlarmReceiver`**: Nếu màn hình đã bật lại trước khi báo thức chạy (`PowerManager.isInteractive == true`), báo thức tự động dừng và không lên lịch lại.
 
-### 5. Giao diện chẩn đoán trung thực (Honest Diagnostics)
+### 7. Giao diện chẩn đoán trung thực (Honest Diagnostics)
 - Tách bạch rõ ràng giữa:
   - **Trạng thái Whitelist HyperOS**: Báo cáo chính xác GMS đã có trong `MILLET_NO_RESTRICT_APP` hay chưa (Green/Red), kèm số lượng gói và giá trị chuỗi thực tế.
   - **Kiểm tra mạng tới Google (`mtalk.google.com:5228`)**: Dán nhãn trung thực "Kiểm tra mạng tới Google" — chỉ đo độ trễ DNS và TCP Handshake từ ứng dụng tới server Google Push, không gây hiểu lầm là đã "sửa" FCM thật của GMS.

@@ -173,7 +173,7 @@ fun SettingsGuideScreen(
             sheetState = rememberModalBottomSheetState(skipPartiallyExpanded = true)
         ) {
             ReadmeSheetContent(
-                version = "1.6.1",
+                version = "1.6.2",
                 onDismiss = { showReadmeSheet = false }
             )
         }
@@ -691,7 +691,7 @@ fun SettingsGuideScreen(
                     )
                     Spacer(modifier = Modifier.height(2.dp))
                     Text(
-                        text = "Phiên bản 1.5.0 (Build 6) • Xiaomi HyperOS & Android",
+                        text = "Phiên bản 1.6.2 (Build 9) • Xiaomi HyperOS & Android",
                         style = MaterialTheme.typography.bodySmall,
                         color = MaterialTheme.colorScheme.onSurfaceVariant
                     )
@@ -794,7 +794,7 @@ private fun ReadmeSheetContent(
                 color = MaterialTheme.colorScheme.onSurface
             )
             Text(
-                text = "Phiên bản $version (Build 8) • Xiaomi HyperOS & Android",
+                text = "Phiên bản $version (Build 9) • Xiaomi HyperOS & Android",
                 style = MaterialTheme.typography.bodySmall,
                 color = MaterialTheme.colorScheme.onSurfaceVariant
             )
@@ -829,8 +829,9 @@ private fun ReadmeSheetContent(
                     Text(
                         text = "• File APK: FCM_Guard.apk\n" +
                                "• Vị trí: Đặt trực tiếp tại thư mục gốc của dự án (/)\n" +
-                               "• Phiên bản: $version (Build 8)\n" +
-                               "• targetSdk: 35 (Android 15 tiêu chuẩn, cập nhật mượt mà trực tiếp đè lên bản cũ không bị lỗi -26, giao diện tràn viền toàn màn hình không bị vệt đen)\n" +
+                               "• Phiên bản: $version (Build 9)\n" +
+                               "• targetSdk: 22 (Bắt buộc để ghi key vendor-private MILLET_NO_RESTRICT_APP qua quyền Sửa đổi cài đặt hệ thống)\n" +
+                               "• Lưu ý cài đặt: Hãy gỡ bản cũ (1.6.1) trước khi cài bản 1.6.2 để tránh lỗi hạ cấp quyền -26.\n" +
                                "• Cách tải: Click chuột phải vào file FCM_Guard.apk trong cây thư mục bên trái → Chọn 'Download' (hoặc xuất file ZIP dự án).",
                         style = MaterialTheme.typography.bodySmall,
                         color = MaterialTheme.colorScheme.onSurface,
@@ -840,7 +841,7 @@ private fun ReadmeSheetContent(
             }
         }
 
-        // Section: HyperOS MILLET_NO_RESTRICT_APP & TargetSdk 35 Breakdown
+        // Section: HyperOS MILLET_NO_RESTRICT_APP & TargetSdk 22 Breakdown
         item {
             OutlinedCard(
                 shape = RoundedCornerShape(12.dp),
@@ -854,15 +855,15 @@ private fun ReadmeSheetContent(
             ) {
                 Column(modifier = Modifier.padding(14.dp)) {
                     Text(
-                        text = "⚡ Đột phá cơ chế: MILLET_NO_RESTRICT_APP & ContentObserver",
+                        text = "⚡ Đột phá v1.6.2: Khôi phục targetSdk 22 & Sửa dải đen",
                         fontWeight = FontWeight.Bold,
                         style = MaterialTheme.typography.titleSmall,
                         color = MaterialTheme.colorScheme.primary
                     )
                     Spacer(modifier = Modifier.height(6.dp))
                     Text(
-                        text = "• Nguyên nhân gốc lỗi tắt màn hình mất thông báo: Trên Xiaomi HyperOS China ROM, tiến trình Greezer và PowerKeeper tự động đóng băng Google Play Services (GMS) và cắt socket MCS khi 'com.google.android.gms' không nằm trong danh sách cài đặt hệ thống Settings.System.MILLET_NO_RESTRICT_APP.\n\n" +
-                               "• Chuẩn targetSdk 35 hiện đại: Giữ nguyên permission model hiện đại giúp việc cập nhật đè lên app cũ diễn ra bình thường (không bị lỗi -26 Can't downgrade permissions), đồng thời hỗ trợ giao diện tràn viền mượt mà (Edge-to-Edge) không bị vệt đen letterbox.\n\n" +
+                        text = "• Lý do dùng targetSdk 22: Trên targetSdk 35, hệ điều hành Android chặn Settings.System.putString ghi key vendor-private của Xiaomi (báo lỗi KEY_UNSUPPORTED). Phiên bản 1.6.2 quay lại targetSdk 22 theo đúng chuẩn từ repo gốc ReedGAOOO/FCMGuard-HyperOS để mở đường tương thích cũ (legacy permission path), giúp quyền 'Sửa đổi cài đặt hệ thống' ghi thành công GMS vào MILLET_NO_RESTRICT_APP.\n\n" +
+                               "• Xóa bỏ dải đen (Letterbox) cuối màn hình: Đã cấu hình android:resizeableActivity=\"true\" và meta-data android.max_aspect_ratio=\"3.0\" trong Manifest kèm padding thanh điều hướng chuẩn, loại bỏ hoàn toàn viền đen ở các màn hình dài đời mới.\n\n" +
                                "• Giám sát thời gian thực (ContentObserver Watchdog): HyperOS thường xuyên tự động dựng lại danh sách MILLET_NO_RESTRICT_APP và xóa GMS ra ngoài. FCM Guard đăng ký ContentObserver lắng nghe URI cài đặt này; ngay khi HyperOS xóa GMS, FCM Guard tự động ghi lại GMS ngay lập tức (debounce ~1s)!",
                         style = MaterialTheme.typography.bodySmall,
                         color = MaterialTheme.colorScheme.onSurface,
@@ -891,7 +892,7 @@ private fun ReadmeSheetContent(
         // Section: Key Features
         item {
             Text(
-                text = "🚀 Các tính năng chính v1.6.0",
+                text = "🚀 Các tính năng chính v1.6.2",
                 fontWeight = FontWeight.Bold,
                 style = MaterialTheme.typography.titleMedium
             )

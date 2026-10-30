@@ -109,8 +109,8 @@ fun DiagnosticsScreen(
                 WhitelistResult.ALREADY_PRESENT -> "[WHITELIST] GMS (com.google.android.gms) đã có trong MILLET_NO_RESTRICT_APP."
                 WhitelistResult.ADDED -> "[WHITELIST] Đã thêm thành công com.google.android.gms vào MILLET_NO_RESTRICT_APP!"
                 WhitelistResult.NO_PERMISSION -> "[WHITELIST ERROR] Thiếu quyền Sửa đổi cài đặt hệ thống (WRITE_SETTINGS)!"
-                WhitelistResult.WRITE_FAILED -> "[WHITELIST ERROR] Ghi thất bại vào Settings.System.MILLET_NO_RESTRICT_APP."
-                WhitelistResult.KEY_UNSUPPORTED -> "[WHITELIST] Thiết bị không hỗ trợ key MILLET_NO_RESTRICT_APP."
+                WhitelistResult.WRITE_FAILED,
+                WhitelistResult.KEY_UNSUPPORTED -> "[WHITELIST] Ghi bị từ chối, kiểm tra targetSdk phải là 22 và quyền Sửa đổi cài đặt hệ thống."
             }
             consoleLogs = listOf(logLine, "Danh sách gói hiện tại: ${status.rawValue}") + consoleLogs
             isCheckingWhitelist = false

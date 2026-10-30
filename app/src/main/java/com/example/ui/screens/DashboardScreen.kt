@@ -410,10 +410,9 @@ fun DashboardScreen(
                                             HyperOsUtils.openWriteSettingsPermission(context)
                                             "Thiếu quyền 'Sửa đổi cài đặt hệ thống'. Vui lòng gạt BẬT quyền cho FCM Guard!"
                                         }
-                                        com.example.core.WhitelistResult.WRITE_FAILED ->
-                                            "Không thể ghi cài đặt hệ thống. Vui lòng kiểm tra quyền Write Settings!"
+                                        com.example.core.WhitelistResult.WRITE_FAILED,
                                         com.example.core.WhitelistResult.KEY_UNSUPPORTED ->
-                                            "Thiết bị không hỗ trợ key MILLET_NO_RESTRICT_APP của Xiaomi!"
+                                            "Ghi bị từ chối, kiểm tra targetSdk phải là 22 và quyền Sửa đổi cài đặt hệ thống!"
                                     }
                                     Toast.makeText(context, msg, Toast.LENGTH_LONG).show()
                                 }

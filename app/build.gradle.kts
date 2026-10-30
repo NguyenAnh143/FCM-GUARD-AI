@@ -14,10 +14,10 @@ android {
 
   defaultConfig {
     applicationId = "com.aistudio.fcmguard.hpos"
-    minSdk = 24
-    targetSdk = 35
-    versionCode = 8
-    versionName = "1.6.1"
+    minSdk = 21
+    targetSdk = 22
+    versionCode = 9
+    versionName = "1.6.2"
 
     testInstrumentationRunner = "androidx.test.runner.AndroidJUnitRunner"
   }
