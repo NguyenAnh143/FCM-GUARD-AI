@@ -173,7 +173,7 @@ fun SettingsGuideScreen(
             sheetState = rememberModalBottomSheetState(skipPartiallyExpanded = true)
         ) {
             ReadmeSheetContent(
-                version = "1.5.0",
+                version = "1.6.1",
                 onDismiss = { showReadmeSheet = false }
             )
         }
@@ -794,13 +794,13 @@ private fun ReadmeSheetContent(
                 color = MaterialTheme.colorScheme.onSurface
             )
             Text(
-                text = "Phiên bản $version (Build 6) • Xiaomi HyperOS & Android",
+                text = "Phiên bản $version (Build 8) • Xiaomi HyperOS & Android",
                 style = MaterialTheme.typography.bodySmall,
                 color = MaterialTheme.colorScheme.onSurfaceVariant
             )
             Spacer(modifier = Modifier.height(4.dp))
             Text(
-                text = "Giải pháp tối ưu hóa và duy trì thông báo đẩy Firebase Cloud Messaging (FCM) dành riêng cho các thiết bị Xiaomi HyperOS / MIUI và Android — Tiết kiệm pin, không cần Root, thân thiện 100% với ứng dụng ngân hàng.",
+                text = "Giải pháp tối ưu hóa và duy trì thông báo đẩy Firebase Cloud Messaging (FCM) dành riêng cho các thiết bị Xiaomi HyperOS / MIUI (kể cả bản nội địa Trung Quốc) và Android — Tiết kiệm pin, không cần Root, thân thiện 100% với ứng dụng ngân hàng.",
                 style = MaterialTheme.typography.bodySmall,
                 color = MaterialTheme.colorScheme.onSurface,
                 lineHeight = 18.sp
@@ -828,9 +828,42 @@ private fun ReadmeSheetContent(
                     Spacer(modifier = Modifier.height(6.dp))
                     Text(
                         text = "• File APK: FCM_Guard.apk\n" +
-                               "• Vị trí: Đặt trực tiếp tại thư mục gốc của dự án (/\n" +
-                               "• Phiên bản: $version (Build 6)\n" +
+                               "• Vị trí: Đặt trực tiếp tại thư mục gốc của dự án (/)\n" +
+                               "• Phiên bản: $version (Build 8)\n" +
+                               "• targetSdk: 35 (Android 15 tiêu chuẩn, cập nhật mượt mà trực tiếp đè lên bản cũ không bị lỗi -26, giao diện tràn viền toàn màn hình không bị vệt đen)\n" +
                                "• Cách tải: Click chuột phải vào file FCM_Guard.apk trong cây thư mục bên trái → Chọn 'Download' (hoặc xuất file ZIP dự án).",
+                        style = MaterialTheme.typography.bodySmall,
+                        color = MaterialTheme.colorScheme.onSurface,
+                        lineHeight = 18.sp
+                    )
+                }
+            }
+        }
+
+        // Section: HyperOS MILLET_NO_RESTRICT_APP & TargetSdk 35 Breakdown
+        item {
+            OutlinedCard(
+                shape = RoundedCornerShape(12.dp),
+                colors = CardDefaults.outlinedCardColors(
+                    containerColor = MaterialTheme.colorScheme.surface
+                ),
+                border = CardDefaults.outlinedCardBorder().copy(
+                    brush = androidx.compose.ui.graphics.SolidColor(MaterialTheme.colorScheme.primary)
+                ),
+                modifier = Modifier.fillMaxWidth()
+            ) {
+                Column(modifier = Modifier.padding(14.dp)) {
+                    Text(
+                        text = "⚡ Đột phá cơ chế: MILLET_NO_RESTRICT_APP & ContentObserver",
+                        fontWeight = FontWeight.Bold,
+                        style = MaterialTheme.typography.titleSmall,
+                        color = MaterialTheme.colorScheme.primary
+                    )
+                    Spacer(modifier = Modifier.height(6.dp))
+                    Text(
+                        text = "• Nguyên nhân gốc lỗi tắt màn hình mất thông báo: Trên Xiaomi HyperOS China ROM, tiến trình Greezer và PowerKeeper tự động đóng băng Google Play Services (GMS) và cắt socket MCS khi 'com.google.android.gms' không nằm trong danh sách cài đặt hệ thống Settings.System.MILLET_NO_RESTRICT_APP.\n\n" +
+                               "• Chuẩn targetSdk 35 hiện đại: Giữ nguyên permission model hiện đại giúp việc cập nhật đè lên app cũ diễn ra bình thường (không bị lỗi -26 Can't downgrade permissions), đồng thời hỗ trợ giao diện tràn viền mượt mà (Edge-to-Edge) không bị vệt đen letterbox.\n\n" +
+                               "• Giám sát thời gian thực (ContentObserver Watchdog): HyperOS thường xuyên tự động dựng lại danh sách MILLET_NO_RESTRICT_APP và xóa GMS ra ngoài. FCM Guard đăng ký ContentObserver lắng nghe URI cài đặt này; ngay khi HyperOS xóa GMS, FCM Guard tự động ghi lại GMS ngay lập tức (debounce ~1s)!",
                         style = MaterialTheme.typography.bodySmall,
                         color = MaterialTheme.colorScheme.onSurface,
                         lineHeight = 18.sp
@@ -848,32 +881,30 @@ private fun ReadmeSheetContent(
             )
             Spacer(modifier = Modifier.height(4.dp))
             Text(
-                text = "Trên hệ điều hành Xiaomi HyperOS và MIUI, cơ chế quản lý pin nghiêm ngặt thường xuyên ngắt kết nối socket ngầm của Google Play Services (GMS) tới máy chủ Google FCM (mtalk.google.com:5228), khiến thông báo từ các ứng dụng như Facebook Messenger, Zalo, Telegram, WhatsApp... bị trễ hoặc chỉ xuất hiện khi người dùng mở ứng dụng.\n\n" +
-                        "FCM Guard được thiết kế theo triết lý: Đặc quyền thấp nhất – Độ tin cậy cao nhất – Tuyệt đối an toàn cho tài chính. Ứng dụng khôi phục và duy trì kênh nhận tin push bằng các Intent hệ thống tiêu chuẩn mà không can thiệp sâu vào nhân hệ điều hành.",
+                text = "FCM Guard được thiết kế theo triết lý: Đặc quyền thấp nhất – Độ tin cậy cao nhất – Tuyệt đối an toàn cho tài chính. Ứng dụng khôi phục và duy trì kênh nhận tin push bằng whitelist hệ thống và Intent broadcast tiêu chuẩn mà không can thiệp sâu vào nhân hệ điều hành.",
                 style = MaterialTheme.typography.bodySmall,
                 color = MaterialTheme.colorScheme.onSurfaceVariant,
                 lineHeight = 18.sp
             )
         }
 
-        // Section: 8 Key Features
+        // Section: Key Features
         item {
             Text(
-                text = "🚀 Các tính năng chính",
+                text = "🚀 Các tính năng chính v1.6.0",
                 fontWeight = FontWeight.Bold,
                 style = MaterialTheme.typography.titleMedium
             )
             Spacer(modifier = Modifier.height(6.dp))
 
             val features = listOf(
-                "1. Thân thiện tuyệt đối với ứng dụng ngân hàng" to "Không Root, Không Shizuku, Không Accessibility Service (trợ năng), Không VPN ngầm, Không Device Admin. Tuyệt đối không bị các ứng dụng ngân hàng (VCB Digibank, Techcombank, MB Bank, BIDV, VPBank, MoMo, VNPay...) phát hiện hay từ chối mở.",
-                "2. Giám sát thông minh theo sự kiện & Siêu tiết kiệm pin" to "Chỉ kích hoạt kiểm tra khi có sự kiện mạng phục hồi hoặc khi bật sáng màn hình. Tùy chọn chu kỳ bảo vệ dự phòng: 10 phút, 15 phút, 30 phút (Mặc định). Tích hợp AlarmManager chính xác với WakeLock ngắn để duy trì socket khi tắt màn hình lâu mà không tốn pin.",
-                "3. Thông báo chạy ngầm tùy chọn (Persistent Notification)" to "Cho phép bật/tắt hiển thị thông báo chạy ngầm tùy ý để thanh thông báo luôn gọn gàng.",
-                "4. Trợ lý ứng dụng FCM & Đọc trạng thái Autostart HyperOS" to "Tự động quét toàn bộ ứng dụng sử dụng FCM. Đọc trạng thái Tự khởi chạy HyperOS (OP_AUTO_START = 10008) và phân loại 3 danh mục rõ ràng: Đã bật, Đã tắt, Không rõ. Nhấn vào bất kỳ app nào để mở trang Cài đặt cấu hình nhanh.",
-                "5. Chẩn đoán kết nối Socket thời gian thực" to "Kiểm tra trực tiếp cổng TCP socket mtalk.google.com:5228, thời gian phân giải DNS, độ trễ TCP Handshake và phím tắt gọi giao diện chẩn đoán Google Play Services (*#*#426#*#*).",
-                "6. Nhật ký theo dõi độ trễ & Mất kết nối" to "Lưu trữ lịch sử các lần kiểm tra, đánh thức socket, ghi nhận sự cố mạng giúp người dùng đánh giá độ ổn định kết nối FCM.",
-                "7. Giao diện Đa ngôn ngữ & Chế độ Đen Trắng tối giản" to "Hỗ trợ 11 ngôn ngữ (Tiếng Việt, English, 中文, Español, 日本語, 한국어, Français, Deutsch, Русский, Português, Bahasa Indonesia). Phong cách Đen Trắng đơn sắc tối giản, dịu mắt ở cả chế độ Sáng và chế độ Tối.",
-                "8. Tối ưu cho màn hình nhỏ & dòng máy Xiaomi" to "Toàn bộ nút bấm, hộp thoại, thanh điều hướng và nhãn chữ được tối ưu để không bị che mất chữ trên các màn hình từ 320dp đến 480dp."
+                "1. Whitelist HyperOS & ContentObserver tự động" to "Tự động ghi 'com.google.android.gms' vào Settings.System.MILLET_NO_RESTRICT_APP và canh chừng 24/7 để khôi phục ngay khi HyperOS cố ý xóa bỏ.",
+                "2. Thân thiện tuyệt đối với ứng dụng ngân hàng" to "Không Root, Không Shizuku, Không Accessibility Service, Không VPN ngầm, Không Device Admin. 100% an toàn với tất cả các ứng dụng ngân hàng và ví điện tử.",
+                "3. Chống hao pin thông minh" to "Hủy chu kỳ báo thức CPU ngay khi màn hình sáng hoặc người dùng mở khóa máy (ACTION_SCREEN_ON, ACTION_USER_PRESENT). Chỉ duy trì chu kỳ đánh thức ngắn khi màn hình tắt lâu.",
+                "4. Nút xóa dữ liệu Pin & Hiệu suất (Powerkeeper)" to "Mở trực tiếp trang thông tin ứng dụng com.miui.powerkeeper để xóa sạch dữ liệu giới hạn tiến trình tích tụ của HyperOS.",
+                "5. Quét & Phân loại ứng dụng FCM" to "Phân loại 3 danh mục rõ ràng: Đã bật, Đã tắt, Không rõ. Nhấn vào bất kỳ app nào để mở trang Cài đặt cấu hình nhanh.",
+                "6. Chẩn đoán kết nối Socket thời gian thực" to "Kiểm tra cổng TCP socket mtalk.google.com:5228, độ trễ DNS và phím tắt chẩn đoán Google Play Services (*#*#426#*#*).",
+                "7. Giao diện Đen Trắng tối giản & Đa ngôn ngữ" to "Hỗ trợ 11 ngôn ngữ, thiết kế đen trắng sắc nét không gây lóa mắt, bố cục phím bấm mở rộng chống tràn chữ trên mọi kích thước màn hình."
             )
 
             Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {

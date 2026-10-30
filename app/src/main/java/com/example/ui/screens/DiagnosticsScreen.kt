@@ -59,26 +59,67 @@ import com.example.i18n.LanguageManager
 import com.example.ui.theme.StatusGreen
 import kotlinx.coroutines.launch
 
+import androidx.compose.material.icons.filled.Security
+import androidx.compose.material.icons.filled.Bolt
+import androidx.compose.runtime.collectAsState
+import com.example.core.GmsWhitelistManager
+import com.example.core.WhitelistResult
+import com.example.data.pref.AppPreferences
+import com.example.ui.theme.StatusAmber
+import com.example.ui.theme.StatusRed
+
 @Composable
 fun DiagnosticsScreen(
+    appPreferences: AppPreferences,
     languageCode: String
 ) {
     val context = LocalContext.current
     val scope = rememberCoroutineScope()
 
+    val isGmsWhitelisted by appPreferences.isGmsWhitelisted.collectAsState()
+    val milletRawValue by appPreferences.milletRawValue.collectAsState()
+    var isCheckingWhitelist by remember { mutableStateOf(false) }
+
     var isTesting by remember { mutableStateOf(false) }
     var testResult by remember { mutableStateOf<HeartbeatResult?>(null) }
-    var consoleLogs by remember { mutableStateOf(listOf("Sẵn sàng kiểm tra socket mtalk.google.com:5228...")) }
+    var consoleLogs by remember {
+        mutableStateOf(
+            listOf(
+                "Sẵn sàng kiểm tra cài đặt MILLET_NO_RESTRICT_APP & socket mtalk.google.com:5228...",
+                "FCM Guard version: 1.6.1 (Build 8) - TargetSdk 35 Android 15 standard"
+            )
+        )
+    }
 
     fun str(key: String): String = LanguageManager.getString(key, languageCode)
+
+    fun checkAndWriteWhitelist() {
+        if (isCheckingWhitelist) return
+        isCheckingWhitelist = true
+        scope.launch {
+            val res = GmsWhitelistManager.ensureGmsWhitelisted(context)
+            val status = GmsWhitelistManager.getStatus(context)
+            appPreferences.updateWhitelistState(status.isGmsWhitelisted, status.rawValue, res)
+
+            val logLine = when (res) {
+                WhitelistResult.ALREADY_PRESENT -> "[WHITELIST] GMS (com.google.android.gms) đã có trong MILLET_NO_RESTRICT_APP."
+                WhitelistResult.ADDED -> "[WHITELIST] Đã thêm thành công com.google.android.gms vào MILLET_NO_RESTRICT_APP!"
+                WhitelistResult.NO_PERMISSION -> "[WHITELIST ERROR] Thiếu quyền Sửa đổi cài đặt hệ thống (WRITE_SETTINGS)!"
+                WhitelistResult.WRITE_FAILED -> "[WHITELIST ERROR] Ghi thất bại vào Settings.System.MILLET_NO_RESTRICT_APP."
+                WhitelistResult.KEY_UNSUPPORTED -> "[WHITELIST] Thiết bị không hỗ trợ key MILLET_NO_RESTRICT_APP."
+            }
+            consoleLogs = listOf(logLine, "Danh sách gói hiện tại: ${status.rawValue}") + consoleLogs
+            isCheckingWhitelist = false
+        }
+    }
 
     fun runDiagnostics() {
         if (isTesting) return
         isTesting = true
         consoleLogs = listOf(
-            "Bắt đầu phân giải DNS mtalk.google.com...",
-            "Đang gửi yêu cầu tra cứu bản ghi A/AAAA..."
-        )
+            "[SOCKET TEST] Bắt đầu phân giải DNS mtalk.google.com...",
+            "[SOCKET TEST] Đang gửi yêu cầu tra cứu bản ghi A/AAAA..."
+        ) + consoleLogs
 
         scope.launch {
             val db = AppDatabase.getDatabase(context)
@@ -90,17 +131,15 @@ fun DiagnosticsScreen(
             testResult = result
 
             val newLogs = mutableListOf<String>()
-            newLogs.add("DNS: Phân giải thành công (${result.dnsLatencyMs}ms)")
-            newLogs.add("Máy chủ Google Push IP: ${result.serverIp}")
+            newLogs.add("[SOCKET TEST] DNS: Phân giải thành công (${result.dnsLatencyMs}ms) -> IP: ${result.serverIp}")
             if (result.success) {
-                newLogs.add("TCP Handshake cổng 5228: Thành công (${result.tcpLatencyMs}ms)")
-                newLogs.add("Tổng độ trễ kết nối: ${result.latencyMs}ms")
-                newLogs.add("Trạng thái: Socket hoạt động bình thường, sẵn sàng nhận FCM push")
+                newLogs.add("[SOCKET TEST] TCP Handshake cổng 5228: Thành công (${result.tcpLatencyMs}ms)")
+                newLogs.add("[SOCKET TEST] Tổng độ trễ kết nối: ${result.latencyMs}ms")
+                newLogs.add("[SOCKET TEST] Kết nối mạng tới Google mtalk hoạt động tốt (Lưu ý: Chỉ đo mạng, không thay thế GMS Whitelist)")
             } else {
-                newLogs.add("TCP Handshake: Thất bại hoặc timeout")
-                newLogs.add("Lỗi chi tiết: ${result.message}")
+                newLogs.add("[SOCKET TEST] TCP Handshake: Thất bại hoặc timeout (${result.message})")
             }
-            consoleLogs = newLogs
+            consoleLogs = newLogs + consoleLogs
             isTesting = false
         }
     }
@@ -112,7 +151,117 @@ fun DiagnosticsScreen(
         contentPadding = PaddingValues(horizontal = 16.dp, vertical = 18.dp),
         verticalArrangement = Arrangement.spacedBy(14.dp)
     ) {
-        // Overview Card
+        // Whitelist HyperOS Status Inspector Card
+        item {
+            OutlinedCard(
+                shape = RoundedCornerShape(16.dp),
+                colors = CardDefaults.outlinedCardColors(
+                    containerColor = MaterialTheme.colorScheme.surface
+                ),
+                border = CardDefaults.outlinedCardBorder().copy(
+                    brush = androidx.compose.ui.graphics.SolidColor(
+                        if (isGmsWhitelisted) MaterialTheme.colorScheme.outline else MaterialTheme.colorScheme.error
+                    )
+                ),
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .testTag("diag_whitelist_card")
+            ) {
+                Column(modifier = Modifier.padding(16.dp)) {
+                    Row(verticalAlignment = Alignment.CenterVertically) {
+                        Box(
+                            modifier = Modifier
+                                .size(38.dp)
+                                .clip(CircleShape)
+                                .background(if (isGmsWhitelisted) StatusGreen.copy(alpha = 0.15f) else MaterialTheme.colorScheme.error.copy(alpha = 0.15f)),
+                            contentAlignment = Alignment.Center
+                        ) {
+                            Icon(
+                                imageVector = if (isGmsWhitelisted) Icons.Default.CheckCircle else Icons.Default.Security,
+                                contentDescription = null,
+                                tint = if (isGmsWhitelisted) StatusGreen else MaterialTheme.colorScheme.error,
+                                modifier = Modifier.size(20.dp)
+                            )
+                        }
+                        Spacer(modifier = Modifier.width(12.dp))
+                        Column {
+                            Text(
+                                text = "Kiểm tra Whitelist HyperOS",
+                                style = MaterialTheme.typography.titleSmall,
+                                fontWeight = FontWeight.Bold,
+                                color = MaterialTheme.colorScheme.onSurface
+                            )
+                            Text(
+                                text = "Settings.System.MILLET_NO_RESTRICT_APP",
+                                style = MaterialTheme.typography.bodySmall,
+                                color = MaterialTheme.colorScheme.onSurfaceVariant,
+                                fontWeight = FontWeight.SemiBold,
+                                fontSize = 11.sp
+                            )
+                        }
+                    }
+
+                    Spacer(modifier = Modifier.height(10.dp))
+
+                    Text(
+                        text = "HyperOS Greezer sẽ quét danh sách này để quyết định có đóng băng ứng dụng khi tắt màn hình hay không. Cần đảm bảo 'com.google.android.gms' luôn có mặt.",
+                        style = MaterialTheme.typography.bodySmall,
+                        color = MaterialTheme.colorScheme.onSurfaceVariant,
+                        lineHeight = 17.sp
+                    )
+
+                    Spacer(modifier = Modifier.height(10.dp))
+
+                    // Detail rows
+                    MetricItem(
+                        icon = Icons.Default.CheckCircle,
+                        title = "GMS trong danh sách",
+                        value = if (isGmsWhitelisted) "ĐÃ CÓ (TỐT)" else "CHƯA CÓ (NGUY HIỂM)"
+                    )
+
+                    Spacer(modifier = Modifier.height(6.dp))
+
+                    MetricItem(
+                        icon = Icons.Default.Security,
+                        title = "Quyền WRITE_SETTINGS",
+                        value = if (HyperOsUtils.canWriteSystemSettings(context)) "ĐÃ CẤP" else "CHƯA CẤP"
+                    )
+
+                    Spacer(modifier = Modifier.height(12.dp))
+
+                    Button(
+                        onClick = { checkAndWriteWhitelist() },
+                        enabled = !isCheckingWhitelist,
+                        shape = RoundedCornerShape(10.dp),
+                        contentPadding = PaddingValues(horizontal = 14.dp, vertical = 10.dp),
+                        colors = ButtonDefaults.buttonColors(
+                            containerColor = MaterialTheme.colorScheme.primary,
+                            contentColor = MaterialTheme.colorScheme.onPrimary
+                        ),
+                        modifier = Modifier
+                            .fillMaxWidth()
+                            .defaultMinSize(minHeight = 48.dp)
+                            .testTag("btn_check_write_whitelist")
+                    ) {
+                        if (isCheckingWhitelist) {
+                            CircularProgressIndicator(
+                                modifier = Modifier.size(18.dp),
+                                color = MaterialTheme.colorScheme.onPrimary,
+                                strokeWidth = 2.dp
+                            )
+                            Spacer(modifier = Modifier.width(8.dp))
+                            Text("Đang kiểm tra & ghi...", fontWeight = FontWeight.Bold)
+                        } else {
+                            Icon(imageVector = Icons.Default.Bolt, contentDescription = null, modifier = Modifier.size(18.dp))
+                            Spacer(modifier = Modifier.width(6.dp))
+                            Text("Kiểm tra & Ghi Whitelist ngay", fontWeight = FontWeight.Bold, fontSize = 14.sp)
+                        }
+                    }
+                }
+            }
+        }
+
+        // Socket Network Check Card (Honest Labeling)
         item {
             OutlinedCard(
                 shape = RoundedCornerShape(16.dp),
@@ -143,7 +292,7 @@ fun DiagnosticsScreen(
                         Spacer(modifier = Modifier.width(12.dp))
                         Column {
                             Text(
-                                text = str("diag_title"),
+                                text = "Kiểm tra mạng tới Google (Socket Test)",
                                 style = MaterialTheme.typography.titleSmall,
                                 fontWeight = FontWeight.Bold,
                                 color = MaterialTheme.colorScheme.onSurface
@@ -161,7 +310,7 @@ fun DiagnosticsScreen(
                     Spacer(modifier = Modifier.height(10.dp))
 
                     Text(
-                        text = str("diag_desc"),
+                        text = "Kiểm tra trực tiếp cổng TCP socket 5228 và độ trễ DNS từ máy tới máy chủ Push của Google. Lưu ý: Đây chỉ là kiểm tra kết nối mạng của app FCM Guard, không can thiệp kết nối FCM thật của GMS.",
                         style = MaterialTheme.typography.bodySmall,
                         color = MaterialTheme.colorScheme.onSurfaceVariant,
                         lineHeight = 18.sp
@@ -175,8 +324,8 @@ fun DiagnosticsScreen(
                         shape = RoundedCornerShape(10.dp),
                         contentPadding = PaddingValues(horizontal = 14.dp, vertical = 10.dp),
                         colors = ButtonDefaults.buttonColors(
-                            containerColor = MaterialTheme.colorScheme.primary,
-                            contentColor = MaterialTheme.colorScheme.onPrimary
+                            containerColor = MaterialTheme.colorScheme.surfaceVariant,
+                            contentColor = MaterialTheme.colorScheme.onSurface
                         ),
                         modifier = Modifier
                             .fillMaxWidth()
@@ -186,15 +335,15 @@ fun DiagnosticsScreen(
                         if (isTesting) {
                             CircularProgressIndicator(
                                 modifier = Modifier.size(18.dp),
-                                color = MaterialTheme.colorScheme.onPrimary,
+                                color = MaterialTheme.colorScheme.onSurface,
                                 strokeWidth = 2.dp
                             )
                             Spacer(modifier = Modifier.width(8.dp))
-                            Text("Đang kiểm tra...", fontWeight = FontWeight.Bold)
+                            Text("Đang kiểm tra socket...", fontWeight = FontWeight.Bold)
                         } else {
                             Icon(imageVector = Icons.Default.NetworkCheck, contentDescription = null, modifier = Modifier.size(18.dp))
                             Spacer(modifier = Modifier.width(6.dp))
-                            Text(str("btn_run_test"), fontWeight = FontWeight.Bold, fontSize = 14.sp)
+                            Text("Bắt đầu kiểm tra socket", fontWeight = FontWeight.Bold, fontSize = 14.sp)
                         }
                     }
 

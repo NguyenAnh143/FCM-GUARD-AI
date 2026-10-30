@@ -10,17 +10,24 @@ import android.content.Context
 import android.content.Intent
 import android.content.IntentFilter
 import android.content.pm.ServiceInfo
+import android.database.ContentObserver
 import android.net.ConnectivityManager
 import android.net.Network
 import android.net.NetworkCapabilities
 import android.net.NetworkRequest
 import android.os.Build
+import android.os.Handler
 import android.os.IBinder
+import android.os.Looper
+import android.provider.Settings
 import android.util.Log
 import androidx.core.app.NotificationCompat
 import com.example.MainActivity
 import com.example.R
+import com.example.core.FcmAlarmScheduler
 import com.example.core.GmsHeartbeatManager
+import com.example.core.GmsWhitelistManager
+import com.example.core.WhitelistResult
 import com.example.data.db.AppDatabase
 import com.example.data.pref.AppPreferences
 import kotlinx.coroutines.CoroutineScope
@@ -29,6 +36,7 @@ import kotlinx.coroutines.Job
 import kotlinx.coroutines.delay
 import kotlinx.coroutines.isActive
 import kotlinx.coroutines.launch
+import kotlinx.coroutines.withContext
 
 class FcmGuardService : Service() {
 
@@ -42,6 +50,10 @@ class FcmGuardService : Service() {
     private var networkCallback: ConnectivityManager.NetworkCallback? = null
     private var screenReceiver: BroadcastReceiver? = null
 
+    // ContentObserver for HyperOS MILLET_NO_RESTRICT_APP
+    private var whitelistObserver: ContentObserver? = null
+    private var whitelistDebounceJob: Job? = null
+
     // Dual periodic timers
     private var screenOnHeartbeatJob: Job? = null
     private var screenOffHeartbeatJob: Job? = null
@@ -54,6 +66,14 @@ class FcmGuardService : Service() {
 
         registerNetworkListener()
         registerScreenStateReceiver()
+        registerWhitelistObserver()
+
+        // Check & ensure GMS is in MILLET_NO_RESTRICT_APP on service creation
+        serviceScope.launch(Dispatchers.IO) {
+            val result = GmsWhitelistManager.ensureGmsWhitelisted(applicationContext)
+            val status = GmsWhitelistManager.getStatus(applicationContext)
+            appPreferences.updateWhitelistState(status.isGmsWhitelisted, status.rawValue, result)
+        }
 
         // Start initial heartbeat timers based on current screen state
         val powerManager = getSystemService(Context.POWER_SERVICE) as? android.os.PowerManager
@@ -238,9 +258,20 @@ class FcmGuardService : Service() {
                         Intent.ACTION_SCREEN_ON -> {
                             val now = System.currentTimeMillis()
                             appPreferences.updateScreenState(isScreenOn = true, isDeviceSleeping = false)
-                            Log.d(TAG, "ACTION_SCREEN_ON detected: isScreenOn=true")
+                            Log.d(TAG, "ACTION_SCREEN_ON detected: isScreenOn=true -> Cancelling alarm to save battery")
 
-                            // Throttle screen-on heartbeats (minimum 2 minutes apart to prevent spamming)
+                            // Cancel any pending alarm immediately to prevent wakeups while screen is on
+                            FcmAlarmScheduler.cancelAlarm(applicationContext)
+                            startScreenOnTimer()
+
+                            // Check whitelist in background
+                            serviceScope.launch(Dispatchers.IO) {
+                                val result = GmsWhitelistManager.ensureGmsWhitelisted(applicationContext)
+                                val status = GmsWhitelistManager.getStatus(applicationContext)
+                                appPreferences.updateWhitelistState(status.isGmsWhitelisted, status.rawValue, result)
+                            }
+
+                            // Throttle screen-on network ping (minimum 2 minutes apart to prevent spamming)
                             if (now - lastScreenOnTrigger > 2 * 60 * 1000L) {
                                 lastScreenOnTrigger = now
                                 serviceScope.launch {
@@ -269,9 +300,20 @@ class FcmGuardService : Service() {
 
                         Intent.ACTION_USER_PRESENT -> {
                             appPreferences.updateScreenState(isScreenOn = true, isDeviceSleeping = false)
-                            Log.d(TAG, "ACTION_USER_PRESENT detected: User unlocked phone! Triggering immediate heartbeat")
+                            Log.d(TAG, "ACTION_USER_PRESENT detected: User unlocked phone! Cancelling alarm and ensuring GMS whitelist")
 
-                            // User actively unlocked phone: trigger immediate heartbeat so pending messages deliver immediately!
+                            // Cancel pending screen-off alarm
+                            FcmAlarmScheduler.cancelAlarm(applicationContext)
+                            startScreenOnTimer()
+
+                            // Ensure GMS whitelist immediately when unlocked
+                            serviceScope.launch(Dispatchers.IO) {
+                                val result = GmsWhitelistManager.ensureGmsWhitelisted(applicationContext)
+                                val status = GmsWhitelistManager.getStatus(applicationContext)
+                                appPreferences.updateWhitelistState(status.isGmsWhitelisted, status.rawValue, result)
+                            }
+
+                            // Trigger network socket heartbeat
                             serviceScope.launch {
                                 val result = GmsHeartbeatManager.triggerHeartbeat(
                                     applicationContext,
@@ -285,9 +327,6 @@ class FcmGuardService : Service() {
                                     "USER_PRESENT"
                                 )
                             }
-
-                            // Switch to screen-on periodic timer
-                            startScreenOnTimer()
                         }
                     }
                 }
@@ -301,6 +340,32 @@ class FcmGuardService : Service() {
             registerReceiver(screenReceiver, filter)
         } catch (e: Exception) {
             Log.e(TAG, "Screen state receiver registration failed: ${e.message}")
+        }
+    }
+
+    private fun registerWhitelistObserver() {
+        try {
+            val uri = Settings.System.getUriFor(GmsWhitelistManager.KEY_MILLET_NO_RESTRICT_APP)
+            if (uri != null) {
+                whitelistObserver = object : ContentObserver(Handler(Looper.getMainLooper())) {
+                    override fun onChange(selfChange: Boolean) {
+                        super.onChange(selfChange)
+                        Log.d(TAG, "ContentObserver: MILLET_NO_RESTRICT_APP modified in system")
+                        whitelistDebounceJob?.cancel()
+                        whitelistDebounceJob = serviceScope.launch(Dispatchers.IO) {
+                            delay(1000L) // 1s debounce to avoid recursive loops
+                            val result = GmsWhitelistManager.ensureGmsWhitelisted(applicationContext)
+                            val status = GmsWhitelistManager.getStatus(applicationContext)
+                            appPreferences.updateWhitelistState(status.isGmsWhitelisted, status.rawValue, result)
+                            Log.d(TAG, "Debounced GmsWhitelistManager result: $result, isWhitelisted=${status.isGmsWhitelisted}")
+                        }
+                    }
+                }
+                contentResolver.registerContentObserver(uri, false, whitelistObserver!!)
+                Log.d(TAG, "Registered ContentObserver for $uri")
+            }
+        } catch (e: Exception) {
+            Log.e(TAG, "Failed to register ContentObserver for MILLET_NO_RESTRICT_APP: ${e.message}")
         }
     }
 
@@ -353,6 +418,11 @@ class FcmGuardService : Service() {
                 delay(delayMs)
 
                 if (appPreferences.isAutoGuardEnabled.value && !appPreferences.isScreenOn.value) {
+                    // Check whitelist during screen-off period
+                    withContext(Dispatchers.IO) {
+                        GmsWhitelistManager.ensureGmsWhitelisted(applicationContext)
+                    }
+
                     val result = GmsHeartbeatManager.triggerHeartbeat(
                         applicationContext,
                         "PERIODIC_SCREEN_OFF_${appPreferences.screenOffIntervalMinutes.value}M",
@@ -384,21 +454,34 @@ class FcmGuardService : Service() {
 
     private fun triggerManualRepair() {
         serviceScope.launch {
-            val result = GmsHeartbeatManager.triggerHeartbeat(
+            // 1. Maintain GMS in MILLET_NO_RESTRICT_APP
+            val whitelistResult = withContext(Dispatchers.IO) {
+                GmsWhitelistManager.ensureGmsWhitelisted(applicationContext)
+            }
+            val status = GmsWhitelistManager.getStatus(applicationContext)
+            appPreferences.updateWhitelistState(status.isGmsWhitelisted, status.rawValue, whitelistResult)
+
+            // 2. Perform network socket check
+            val netResult = GmsHeartbeatManager.triggerHeartbeat(
                 applicationContext,
                 "MANUAL_REPAIR",
                 appDatabase.heartbeatLogDao()
             )
             appPreferences.updateLastRepair(
                 System.currentTimeMillis(),
-                result.latencyMs,
-                if (result.success) "OK" else "ERROR",
+                netResult.latencyMs,
+                if (netResult.success) "OK" else "ERROR",
                 "MANUAL_REPAIR"
             )
-            updateNotification(
-                if (result.success) "Đã gửi MCS Heartbeat (${result.latencyMs}ms)"
-                else "Lỗi kết nối socket push"
-            )
+
+            val msg = when (whitelistResult) {
+                WhitelistResult.ADDED -> "Đã thêm GMS vào Whitelist (${netResult.latencyMs}ms)"
+                WhitelistResult.ALREADY_PRESENT -> "GMS có trong Whitelist (${netResult.latencyMs}ms)"
+                WhitelistResult.NO_PERMISSION -> "Thiếu quyền Sửa đổi cài đặt hệ thống"
+                WhitelistResult.WRITE_FAILED -> "Ghi Whitelist thất bại (${netResult.latencyMs}ms)"
+                WhitelistResult.KEY_UNSUPPORTED -> "Key hệ thống không được hỗ trợ"
+            }
+            updateNotification(msg)
         }
     }
 
@@ -406,7 +489,11 @@ class FcmGuardService : Service() {
         isRunning = false
         screenOnHeartbeatJob?.cancel()
         screenOffHeartbeatJob?.cancel()
+        whitelistDebounceJob?.cancel()
         com.example.core.FcmAlarmScheduler.cancelAlarm(applicationContext)
+        try {
+            whitelistObserver?.let { contentResolver.unregisterContentObserver(it) }
+        } catch (ignored: Exception) {}
         try {
             networkCallback?.let { connectivityManager?.unregisterNetworkCallback(it) }
         } catch (ignored: Exception) {}

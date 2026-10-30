@@ -111,12 +111,18 @@ fun DashboardScreen(
     var canExactAlarm by remember { mutableStateOf(HyperOsUtils.canScheduleExactAlarms(context)) }
     var hasWriteSettings by remember { mutableStateOf(HyperOsUtils.canWriteSystemSettings(context)) }
 
+    val isGmsWhitelisted by appPreferences.isGmsWhitelisted.collectAsState()
+    val milletRawValue by appPreferences.milletRawValue.collectAsState()
+    val lastWhitelistResult by appPreferences.lastWhitelistResult.collectAsState()
+
     fun str(key: String): String = LanguageManager.getString(key, languageCode)
 
     fun refreshPermissions() {
         isIgnoringBattery = HyperOsUtils.isIgnoringBatteryOptimizations(context)
         canExactAlarm = HyperOsUtils.canScheduleExactAlarms(context)
         hasWriteSettings = HyperOsUtils.canWriteSystemSettings(context)
+        val status = com.example.core.GmsWhitelistManager.getStatus(context)
+        appPreferences.updateWhitelistState(status.isGmsWhitelisted, status.rawValue, status.lastResult)
         appPreferences.updateSystemPermissions(isIgnoringBattery, canExactAlarm)
     }
 
@@ -139,7 +145,239 @@ fun DashboardScreen(
         contentPadding = PaddingValues(horizontal = 16.dp, vertical = 18.dp),
         verticalArrangement = Arrangement.spacedBy(14.dp)
     ) {
-        // Minimal Monochrome Hero Status Card
+        // Core Feature Card: Xiaomi HyperOS Whitelist (MILLET_NO_RESTRICT_APP)
+        item {
+            OutlinedCard(
+                shape = RoundedCornerShape(20.dp),
+                colors = CardDefaults.outlinedCardColors(
+                    containerColor = MaterialTheme.colorScheme.surface
+                ),
+                border = CardDefaults.outlinedCardBorder().copy(
+                    brush = androidx.compose.ui.graphics.SolidColor(
+                        if (isGmsWhitelisted) MaterialTheme.colorScheme.outline else MaterialTheme.colorScheme.error
+                    )
+                ),
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .testTag("gms_whitelist_card")
+            ) {
+                Column(modifier = Modifier.padding(18.dp)) {
+                    Row(
+                        modifier = Modifier.fillMaxWidth(),
+                        verticalAlignment = Alignment.CenterVertically
+                    ) {
+                        Box(
+                            modifier = Modifier
+                                .size(42.dp)
+                                .clip(RoundedCornerShape(12.dp))
+                                .background(
+                                    if (isGmsWhitelisted) StatusGreen.copy(alpha = 0.15f) else MaterialTheme.colorScheme.error.copy(alpha = 0.15f)
+                                ),
+                            contentAlignment = Alignment.Center
+                        ) {
+                            Icon(
+                                imageVector = if (isGmsWhitelisted) Icons.Default.CheckCircle else Icons.Default.Security,
+                                contentDescription = null,
+                                tint = if (isGmsWhitelisted) StatusGreen else MaterialTheme.colorScheme.error,
+                                modifier = Modifier.size(24.dp)
+                            )
+                        }
+                        Spacer(modifier = Modifier.width(12.dp))
+                        Column(modifier = Modifier.weight(1f)) {
+                            Text(
+                                text = "Whitelist HyperOS (GMS)",
+                                style = MaterialTheme.typography.titleMedium,
+                                fontWeight = FontWeight.Bold,
+                                color = MaterialTheme.colorScheme.onSurface
+                            )
+                            Text(
+                                text = "Settings.System.MILLET_NO_RESTRICT_APP",
+                                style = MaterialTheme.typography.bodySmall,
+                                color = MaterialTheme.colorScheme.onSurfaceVariant,
+                                fontSize = 11.sp
+                            )
+                        }
+                    }
+
+                    Spacer(modifier = Modifier.height(12.dp))
+
+                    // Status Badges
+                    Row(
+                        modifier = Modifier.fillMaxWidth(),
+                        horizontalArrangement = Arrangement.spacedBy(8.dp)
+                    ) {
+                        // Whitelist status badge
+                        Box(
+                            modifier = Modifier
+                                .weight(1f)
+                                .clip(RoundedCornerShape(8.dp))
+                                .background(
+                                    if (isGmsWhitelisted) StatusGreen.copy(alpha = 0.12f) else MaterialTheme.colorScheme.error.copy(alpha = 0.12f)
+                                )
+                                .padding(horizontal = 10.dp, vertical = 6.dp)
+                        ) {
+                            Row(verticalAlignment = Alignment.CenterVertically) {
+                                Box(
+                                    modifier = Modifier
+                                        .size(8.dp)
+                                        .clip(CircleShape)
+                                        .background(if (isGmsWhitelisted) StatusGreen else MaterialTheme.colorScheme.error)
+                                )
+                                Spacer(modifier = Modifier.width(6.dp))
+                                Text(
+                                    text = if (isGmsWhitelisted) "GMS: ĐÃ THÊM" else "GMS: CHƯA THÊM",
+                                    fontSize = 11.5.sp,
+                                    fontWeight = FontWeight.Bold,
+                                    color = if (isGmsWhitelisted) StatusGreen else MaterialTheme.colorScheme.error
+                                )
+                            }
+                        }
+
+                        // Write settings badge
+                        Box(
+                            modifier = Modifier
+                                .weight(1f)
+                                .clip(RoundedCornerShape(8.dp))
+                                .background(
+                                    if (hasWriteSettings) StatusGreen.copy(alpha = 0.12f) else StatusAmber.copy(alpha = 0.15f)
+                                )
+                                .padding(horizontal = 10.dp, vertical = 6.dp)
+                        ) {
+                            Row(verticalAlignment = Alignment.CenterVertically) {
+                                Box(
+                                    modifier = Modifier
+                                        .size(8.dp)
+                                        .clip(CircleShape)
+                                        .background(if (hasWriteSettings) StatusGreen else StatusAmber)
+                                )
+                                Spacer(modifier = Modifier.width(6.dp))
+                                Text(
+                                    text = if (hasWriteSettings) "Quyền Ghi: Đã cấp" else "Quyền Ghi: Chưa cấp",
+                                    fontSize = 11.5.sp,
+                                    fontWeight = FontWeight.Bold,
+                                    color = if (hasWriteSettings) StatusGreen else MaterialTheme.colorScheme.onSurface
+                                )
+                            }
+                        }
+                    }
+
+                    Spacer(modifier = Modifier.height(10.dp))
+
+                    Text(
+                        text = if (isGmsWhitelisted) {
+                            "Dịch vụ Google Play đã có trong danh sách ngoại lệ của HyperOS. Greezer / PowerKeeper sẽ không ngắt kết nối FCM khi tắt màn hình."
+                        } else {
+                            "CẢNH BÁO: com.google.android.gms chưa có trong MILLET_NO_RESTRICT_APP. HyperOS sẽ đóng băng Google Play Services khi tắt màn hình lâu, làm mất thông báo!"
+                        },
+                        style = MaterialTheme.typography.bodySmall,
+                        color = MaterialTheme.colorScheme.onSurfaceVariant,
+                        lineHeight = 17.sp
+                    )
+
+                    if (milletRawValue.isNotEmpty()) {
+                        Spacer(modifier = Modifier.height(8.dp))
+                        Box(
+                            modifier = Modifier
+                                .fillMaxWidth()
+                                .clip(RoundedCornerShape(8.dp))
+                                .background(MaterialTheme.colorScheme.surfaceVariant)
+                                .padding(horizontal = 10.dp, vertical = 6.dp)
+                        ) {
+                            val pkgCount = milletRawValue.split(",").filter { it.isNotBlank() }.size
+                            Text(
+                                text = "Giá trị hiện tại ($pkgCount gói): $milletRawValue",
+                                fontSize = 10.5.sp,
+                                maxLines = 2,
+                                color = MaterialTheme.colorScheme.onSurfaceVariant,
+                                lineHeight = 15.sp
+                            )
+                        }
+                    }
+
+                    Spacer(modifier = Modifier.height(14.dp))
+
+                    // Big Action Button: Sửa lỗi ngay
+                    Button(
+                        onClick = {
+                            if (!isRepairing) {
+                                isRepairing = true
+                                scope.launch {
+                                    val writeResult = com.example.core.GmsWhitelistManager.ensureGmsWhitelisted(context)
+                                    val db = AppDatabase.getDatabase(context)
+                                    val socketRes = GmsHeartbeatManager.triggerHeartbeat(
+                                        context,
+                                        "MANUAL_REPAIR",
+                                        db.heartbeatLogDao()
+                                    )
+                                    appPreferences.updateLastRepair(
+                                        System.currentTimeMillis(),
+                                        socketRes.latencyMs,
+                                        if (socketRes.success) "OK" else "ERROR",
+                                        "MANUAL_REPAIR"
+                                    )
+                                    refreshPermissions()
+                                    isRepairing = false
+
+                                    val msg = when (writeResult) {
+                                        com.example.core.WhitelistResult.ALREADY_PRESENT ->
+                                            "GMS đã có sẵn trong danh sách MILLET_NO_RESTRICT_APP của HyperOS!"
+                                        com.example.core.WhitelistResult.ADDED ->
+                                            "Thành công! Đã ghi com.google.android.gms vào MILLET_NO_RESTRICT_APP!"
+                                        com.example.core.WhitelistResult.NO_PERMISSION -> {
+                                            HyperOsUtils.openWriteSettingsPermission(context)
+                                            "Thiếu quyền 'Sửa đổi cài đặt hệ thống'. Vui lòng gạt BẬT quyền cho FCM Guard!"
+                                        }
+                                        com.example.core.WhitelistResult.WRITE_FAILED ->
+                                            "Không thể ghi cài đặt hệ thống. Vui lòng kiểm tra quyền Write Settings!"
+                                        com.example.core.WhitelistResult.KEY_UNSUPPORTED ->
+                                            "Thiết bị không hỗ trợ key MILLET_NO_RESTRICT_APP của Xiaomi!"
+                                    }
+                                    Toast.makeText(context, msg, Toast.LENGTH_LONG).show()
+                                }
+                            }
+                        },
+                        enabled = !isRepairing,
+                        shape = RoundedCornerShape(12.dp),
+                        colors = ButtonDefaults.buttonColors(
+                            containerColor = MaterialTheme.colorScheme.primary,
+                            contentColor = MaterialTheme.colorScheme.onPrimary
+                        ),
+                        modifier = Modifier
+                            .fillMaxWidth()
+                            .defaultMinSize(minHeight = 52.dp)
+                            .testTag("whitelist_repair_now_button")
+                    ) {
+                        if (isRepairing) {
+                            CircularProgressIndicator(
+                                modifier = Modifier.size(20.dp),
+                                color = MaterialTheme.colorScheme.onPrimary,
+                                strokeWidth = 2.dp
+                            )
+                            Spacer(modifier = Modifier.width(8.dp))
+                            Text(
+                                text = "Đang kiểm tra & ghi Whitelist...",
+                                fontWeight = FontWeight.Bold,
+                                fontSize = 14.sp
+                            )
+                        } else {
+                            Icon(
+                                imageVector = Icons.Default.Bolt,
+                                contentDescription = null,
+                                modifier = Modifier.size(20.dp)
+                            )
+                            Spacer(modifier = Modifier.width(8.dp))
+                            Text(
+                                text = if (isGmsWhitelisted) "Kiểm tra lại & Giữ kết nối ngay" else "Sửa lỗi ngay: Thêm GMS vào Whitelist",
+                                fontWeight = FontWeight.Bold,
+                                fontSize = 14.5.sp
+                            )
+                        }
+                    }
+                }
+            }
+        }
+
+        // Network Socket Check to Google (Honest Labeling)
         item {
             MinimalHeroStatusCard(
                 isServiceRunning = isServiceRunning && isAutoGuard,
@@ -155,6 +393,7 @@ fun DashboardScreen(
                     if (!isRepairing) {
                         isRepairing = true
                         scope.launch {
+                            val writeResult = com.example.core.GmsWhitelistManager.ensureGmsWhitelisted(context)
                             val db = AppDatabase.getDatabase(context)
                             val res = GmsHeartbeatManager.triggerHeartbeat(
                                 context,
@@ -167,8 +406,8 @@ fun DashboardScreen(
                                 if (res.success) "OK" else "ERROR",
                                 "MANUAL_REPAIR"
                             )
-                            isRepairing = false
                             refreshPermissions()
+                            isRepairing = false
                         }
                     }
                 }
@@ -977,33 +1216,50 @@ private fun MinimalHeroStatusCard(
                 }
             }
 
-            Spacer(modifier = Modifier.height(16.dp))
+            Spacer(modifier = Modifier.height(10.dp))
 
-            // Action Button: Repair Now
+            Text(
+                text = "Kiểm tra mạng tới Google (mtalk.google.com:5228)",
+                style = MaterialTheme.typography.titleSmall,
+                fontWeight = FontWeight.Bold,
+                color = MaterialTheme.colorScheme.onSurface
+            )
+            Text(
+                text = "Chỉ kiểm tra đường truyền TCP từ máy tới server Google, không can thiệp kết nối FCM thật của GMS",
+                style = MaterialTheme.typography.bodySmall,
+                color = MaterialTheme.colorScheme.onSurfaceVariant,
+                fontSize = 11.sp,
+                textAlign = androidx.compose.ui.text.style.TextAlign.Center,
+                modifier = Modifier.padding(horizontal = 8.dp)
+            )
+
+            Spacer(modifier = Modifier.height(12.dp))
+
+            // Action Button: Test Network to Google
             Button(
                 onClick = onRepairNow,
                 enabled = !isRepairing,
                 shape = RoundedCornerShape(12.dp),
                 colors = ButtonDefaults.buttonColors(
-                    containerColor = MaterialTheme.colorScheme.primary,
-                    contentColor = MaterialTheme.colorScheme.onPrimary
+                    containerColor = MaterialTheme.colorScheme.surfaceVariant,
+                    contentColor = MaterialTheme.colorScheme.onSurface
                 ),
                 modifier = Modifier
                     .fillMaxWidth()
-                    .height(48.dp)
+                    .defaultMinSize(minHeight = 48.dp)
                     .testTag("repair_now_button")
             ) {
                 if (isRepairing) {
                     CircularProgressIndicator(
-                        modifier = Modifier.size(20.dp),
-                        color = MaterialTheme.colorScheme.onPrimary,
+                        modifier = Modifier.size(18.dp),
+                        color = MaterialTheme.colorScheme.onSurface,
                         strokeWidth = 2.dp
                     )
                     Spacer(modifier = Modifier.width(8.dp))
                     Text(
-                        text = str("repairing"),
-                        fontWeight = FontWeight.Bold,
-                        fontSize = 14.sp
+                        text = "Đang kiểm tra mạng...",
+                        fontWeight = FontWeight.SemiBold,
+                        fontSize = 13.5.sp
                     )
                 } else {
                     Icon(
@@ -1013,9 +1269,9 @@ private fun MinimalHeroStatusCard(
                     )
                     Spacer(modifier = Modifier.width(6.dp))
                     Text(
-                        text = str("btn_repair_now"),
-                        fontWeight = FontWeight.Bold,
-                        fontSize = 15.sp
+                        text = "Kiểm tra mạng tới mtalk.google.com",
+                        fontWeight = FontWeight.SemiBold,
+                        fontSize = 13.5.sp
                     )
                 }
             }

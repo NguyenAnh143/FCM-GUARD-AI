@@ -58,6 +58,24 @@ class AppPreferences(context: Context) {
     private val _canScheduleExactAlarms = MutableStateFlow(true)
     val canScheduleExactAlarms: StateFlow<Boolean> = _canScheduleExactAlarms.asStateFlow()
 
+    // GMS MILLET_NO_RESTRICT_APP Whitelist states
+    private val _isGmsWhitelisted = MutableStateFlow(false)
+    val isGmsWhitelisted: StateFlow<Boolean> = _isGmsWhitelisted.asStateFlow()
+
+    private val _milletRawValue = MutableStateFlow("")
+    val milletRawValue: StateFlow<String> = _milletRawValue.asStateFlow()
+
+    private val _lastWhitelistResult = MutableStateFlow<com.example.core.WhitelistResult?>(null)
+    val lastWhitelistResult: StateFlow<com.example.core.WhitelistResult?> = _lastWhitelistResult.asStateFlow()
+
+    fun updateWhitelistState(isWhitelisted: Boolean, rawValue: String?, lastResult: com.example.core.WhitelistResult? = null) {
+        _isGmsWhitelisted.value = isWhitelisted
+        _milletRawValue.value = rawValue ?: ""
+        if (lastResult != null) {
+            _lastWhitelistResult.value = lastResult
+        }
+    }
+
     fun updateSystemPermissions(isBatteryIgnored: Boolean, canExactAlarm: Boolean) {
         _isBatteryOptimizationIgnored.value = isBatteryIgnored
         _canScheduleExactAlarms.value = canExactAlarm

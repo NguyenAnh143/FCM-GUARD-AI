@@ -16,6 +16,7 @@ import androidx.core.content.ContextCompat
 import com.example.core.HyperOsUtils
 import com.example.service.FcmGuardService
 import com.example.ui.FcmGuardApp
+import kotlinx.coroutines.launch
 
 class MainActivity : ComponentActivity() {
 
@@ -82,13 +83,24 @@ class MainActivity : ComponentActivity() {
     }
 
     /**
-     * Refreshes battery optimization and exact alarm permission state into AppPreferences
+     * Refreshes battery optimization, exact alarm permission, and GMS whitelist state
      */
     fun refreshSystemStatus() {
         val app = application as? FcmGuardApplication ?: return
         val isIgnored = HyperOsUtils.isIgnoringBatteryOptimizations(this)
         val canExactAlarm = HyperOsUtils.canScheduleExactAlarms(this)
         app.appPreferences.updateSystemPermissions(isIgnored, canExactAlarm)
+
+        val status = com.example.core.GmsWhitelistManager.getStatus(this)
+        app.appPreferences.updateWhitelistState(status.isGmsWhitelisted, status.rawValue)
+
+        if (status.hasWritePermission && !status.isGmsWhitelisted) {
+            kotlinx.coroutines.CoroutineScope(kotlinx.coroutines.Dispatchers.IO).launch {
+                val res = com.example.core.GmsWhitelistManager.ensureGmsWhitelisted(this@MainActivity)
+                val newStatus = com.example.core.GmsWhitelistManager.getStatus(this@MainActivity)
+                app.appPreferences.updateWhitelistState(newStatus.isGmsWhitelisted, newStatus.rawValue, res)
+            }
+        }
     }
 
     /**

@@ -166,9 +166,7 @@ fun FcmGuardApp(
                 bottomBar = {
                     if (!isWideScreen) {
                         NavigationBar(
-                            modifier = Modifier
-                                .windowInsetsPadding(WindowInsets.navigationBars)
-                                .testTag("bottom_nav_bar"),
+                            modifier = Modifier.testTag("bottom_nav_bar"),
                             containerColor = MaterialTheme.colorScheme.surface
                         ) {
                             navItems.forEachIndexed { index, item ->
@@ -217,6 +215,7 @@ fun FcmGuardApp(
                             languageCode = languageCode
                         )
                         2 -> DiagnosticsScreen(
+                            appPreferences = appPreferences,
                             languageCode = languageCode
                         )
                         3 -> HistoryLogScreen(

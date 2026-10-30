@@ -20,15 +20,23 @@ class AlarmReceiver : BroadcastReceiver() {
         val action = intent?.action ?: return
 
         if (action == ACTION_ALARM_HEARTBEAT) {
-            Log.d(TAG, "Screen-off Alarm received. Waking up GMS socket...")
-
             val powerManager = context.getSystemService(Context.POWER_SERVICE) as? PowerManager
+            val isScreenOn = powerManager?.isInteractive ?: false
+
+            if (isScreenOn) {
+                Log.d(TAG, "Screen is ON (isInteractive=true). Cancelling alarm to save battery.")
+                FcmAlarmScheduler.cancelAlarm(context)
+                return
+            }
+
+            Log.d(TAG, "Screen is OFF. Waking up briefly for GMS whitelist check & socket keep-alive...")
+
             val wakeLock = powerManager?.newWakeLock(
                 PowerManager.PARTIAL_WAKE_LOCK,
                 "FCMGuard::ScreenOffKeepAliveWakeLock"
             )
 
-            wakeLock?.acquire(8000L) // 8s timeout to safely process heartbeat
+            wakeLock?.acquire(8000L) // 8s timeout to safely process
 
             val pendingResult = goAsync()
 
@@ -37,6 +45,12 @@ class AlarmReceiver : BroadcastReceiver() {
                     val prefs = AppPreferences(context)
                     val db = AppDatabase.getDatabase(context)
 
+                    // 1. Ensure GMS is whitelisted in MILLET_NO_RESTRICT_APP (cheap & critical)
+                    val whitelistRes = com.example.core.GmsWhitelistManager.ensureGmsWhitelisted(context)
+                    val currentStatus = com.example.core.GmsWhitelistManager.getStatus(context)
+                    prefs.updateWhitelistState(currentStatus.isGmsWhitelisted, currentStatus.rawValue, whitelistRes)
+
+                    // 2. Network socket heartbeat check if auto guard enabled
                     if (prefs.isAutoGuardEnabled.value) {
                         val result = GmsHeartbeatManager.triggerHeartbeat(
                             context,
@@ -50,11 +64,17 @@ class AlarmReceiver : BroadcastReceiver() {
                             if (result.success) "OK" else "ERROR",
                             "SCREEN_OFF_ALARM"
                         )
+                    }
 
-                        // Reschedule next alarm using screenOffIntervalMinutes
+                    // 3. ONLY reschedule next alarm if screen is STILL off
+                    val stillScreenOff = !(powerManager?.isInteractive ?: false)
+                    if (stillScreenOff && prefs.isAutoGuardEnabled.value) {
                         val interval = prefs.screenOffIntervalMinutes.value
                         FcmAlarmScheduler.scheduleNextAlarm(context, interval)
-                        Log.d(TAG, "Screen-off alarm heartbeat finished ($interval mins): latency=${result.latencyMs}ms, status=${result.success}")
+                        Log.d(TAG, "Rescheduled next screen-off alarm in $interval mins")
+                    } else {
+                        FcmAlarmScheduler.cancelAlarm(context)
+                        Log.d(TAG, "Screen woke up during execution. Cancelled alarm.")
                     }
                 } catch (e: Exception) {
                     Log.e(TAG, "Error in AlarmReceiver: ${e.message}")
