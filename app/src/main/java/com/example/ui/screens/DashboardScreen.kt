@@ -31,9 +31,16 @@ import androidx.compose.material.icons.filled.CleaningServices
 import androidx.compose.material.icons.filled.DeleteSweep
 import androidx.compose.material.icons.filled.Chat
 import androidx.compose.material.icons.filled.NotificationsActive
+import android.content.ClipData
+import android.content.ClipboardManager
+import androidx.compose.material.icons.filled.Circle
+import androidx.compose.material.icons.filled.ContentCopy
 import androidx.compose.material.icons.filled.OpenInNew
 import androidx.compose.material.icons.filled.Security
 import androidx.compose.material.icons.filled.Settings
+import androidx.compose.ui.text.font.FontFamily
+import androidx.compose.ui.text.style.TextAlign
+import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.material3.Button
 import androidx.compose.material3.ButtonDefaults
 import androidx.compose.material3.Card
@@ -275,21 +282,97 @@ fun DashboardScreen(
                     )
 
                     if (milletRawValue.isNotEmpty()) {
-                        Spacer(modifier = Modifier.height(8.dp))
-                        Box(
+                        val packages = milletRawValue.split(",").map { it.trim() }.filter { it.isNotEmpty() }
+                        Spacer(modifier = Modifier.height(10.dp))
+                        Column(
                             modifier = Modifier
                                 .fillMaxWidth()
-                                .clip(RoundedCornerShape(8.dp))
+                                .clip(RoundedCornerShape(10.dp))
                                 .background(MaterialTheme.colorScheme.surfaceVariant)
-                                .padding(horizontal = 10.dp, vertical = 6.dp)
+                                .padding(12.dp)
                         ) {
-                            val pkgCount = milletRawValue.split(",").filter { it.isNotBlank() }.size
+                            Row(
+                                modifier = Modifier.fillMaxWidth(),
+                                horizontalArrangement = Arrangement.SpaceBetween,
+                                verticalAlignment = Alignment.CenterVertically
+                            ) {
+                                Text(
+                                    text = "Giá trị hiện tại (${packages.size} gói):",
+                                    style = MaterialTheme.typography.bodySmall,
+                                    fontWeight = FontWeight.Bold,
+                                    color = MaterialTheme.colorScheme.onSurface
+                                )
+                                Row(
+                                    modifier = Modifier
+                                        .clip(RoundedCornerShape(6.dp))
+                                        .clickable {
+                                            val clipboard = context.getSystemService(android.content.Context.CLIPBOARD_SERVICE) as? ClipboardManager
+                                            clipboard?.setPrimaryClip(ClipData.newPlainText("MILLET_NO_RESTRICT_APP", milletRawValue))
+                                            Toast.makeText(context, "Đã sao chép danh sách gói!", Toast.LENGTH_SHORT).show()
+                                        }
+                                        .padding(horizontal = 6.dp, vertical = 2.dp),
+                                    verticalAlignment = Alignment.CenterVertically
+                                ) {
+                                    Icon(
+                                        imageVector = Icons.Default.ContentCopy,
+                                        contentDescription = "Sao chép",
+                                        tint = MaterialTheme.colorScheme.primary,
+                                        modifier = Modifier.size(13.dp)
+                                    )
+                                    Spacer(modifier = Modifier.width(4.dp))
+                                    Text(
+                                        text = "Sao chép",
+                                        fontSize = 11.sp,
+                                        fontWeight = FontWeight.Bold,
+                                        color = MaterialTheme.colorScheme.primary
+                                    )
+                                }
+                            }
+
+                            Spacer(modifier = Modifier.height(8.dp))
+
+                            // Show each package fully without truncation
+                            Column(verticalArrangement = Arrangement.spacedBy(6.dp)) {
+                                packages.forEach { pkg ->
+                                    val isGms = pkg == "com.google.android.gms"
+                                    Row(
+                                        modifier = Modifier.fillMaxWidth(),
+                                        verticalAlignment = Alignment.CenterVertically
+                                    ) {
+                                        Icon(
+                                            imageVector = if (isGms) Icons.Default.CheckCircle else Icons.Default.Circle,
+                                            contentDescription = null,
+                                            tint = if (isGms) StatusGreen else MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.5f),
+                                            modifier = Modifier.size(if (isGms) 14.dp else 6.dp)
+                                        )
+                                        Spacer(modifier = Modifier.width(8.dp))
+                                        Text(
+                                            text = pkg,
+                                            fontFamily = FontFamily.Monospace,
+                                            fontSize = 11.sp,
+                                            fontWeight = if (isGms) FontWeight.Bold else FontWeight.Normal,
+                                            color = if (isGms) StatusGreen else MaterialTheme.colorScheme.onSurface,
+                                            lineHeight = 15.sp,
+                                            modifier = Modifier.weight(1f)
+                                        )
+                                    }
+                                }
+                            }
+                        }
+                    } else {
+                        Spacer(modifier = Modifier.height(10.dp))
+                        Column(
+                            modifier = Modifier
+                                .fillMaxWidth()
+                                .clip(RoundedCornerShape(10.dp))
+                                .background(MaterialTheme.colorScheme.surfaceVariant)
+                                .padding(12.dp)
+                        ) {
                             Text(
-                                text = "Giá trị hiện tại ($pkgCount gói): $milletRawValue",
-                                fontSize = 10.5.sp,
-                                maxLines = 2,
+                                text = "Giá trị hiện tại: Chưa có gói nào trong danh sách hoặc chưa đọc được",
+                                style = MaterialTheme.typography.bodySmall,
                                 color = MaterialTheme.colorScheme.onSurfaceVariant,
-                                lineHeight = 15.sp
+                                fontSize = 11.5.sp
                             )
                         }
                     }
@@ -1094,13 +1177,13 @@ private fun MinimalHeroStatusCard(
         modifier = Modifier.fillMaxWidth()
     ) {
         Column(
-            modifier = Modifier.padding(20.dp),
+            modifier = Modifier.padding(16.dp),
             horizontalAlignment = Alignment.CenterHorizontally
         ) {
             Box(
                 contentAlignment = Alignment.Center,
                 modifier = Modifier
-                    .size(60.dp)
+                    .size(50.dp)
                     .clip(CircleShape)
                     .background(MaterialTheme.colorScheme.surfaceVariant)
             ) {
@@ -1108,11 +1191,11 @@ private fun MinimalHeroStatusCard(
                     imageVector = Icons.Default.Security,
                     contentDescription = "Shield Guard",
                     tint = MaterialTheme.colorScheme.onSurface,
-                    modifier = Modifier.size(32.dp)
+                    modifier = Modifier.size(26.dp)
                 )
             }
 
-            Spacer(modifier = Modifier.height(12.dp))
+            Spacer(modifier = Modifier.height(10.dp))
 
             Text(
                 text = if (isServiceRunning) str("status_active") else str("status_inactive"),
@@ -1123,22 +1206,25 @@ private fun MinimalHeroStatusCard(
 
             Spacer(modifier = Modifier.height(8.dp))
 
-            // Socket Status Badge & Screen State Badge
+            // Socket Status Badge & Screen State Badge (Balanced 50/50 row)
             Row(
+                modifier = Modifier.fillMaxWidth(),
                 verticalAlignment = Alignment.CenterVertically,
                 horizontalArrangement = Arrangement.spacedBy(8.dp)
             ) {
                 // Socket Badge
                 Row(
                     verticalAlignment = Alignment.CenterVertically,
+                    horizontalArrangement = Arrangement.Center,
                     modifier = Modifier
+                        .weight(1f)
                         .clip(RoundedCornerShape(8.dp))
                         .background(MaterialTheme.colorScheme.surfaceVariant)
-                        .padding(horizontal = 10.dp, vertical = 5.dp)
+                        .padding(horizontal = 8.dp, vertical = 6.dp)
                 ) {
                     Box(
                         modifier = Modifier
-                            .size(8.dp)
+                            .size(7.dp)
                             .clip(CircleShape)
                             .background(
                                 when (lastSocketStatus) {
@@ -1151,28 +1237,33 @@ private fun MinimalHeroStatusCard(
                     Spacer(modifier = Modifier.width(6.dp))
                     Text(
                         text = when (lastSocketStatus) {
-                            "OK" -> str("socket_online")
+                            "OK" -> "Socket: Kết nối tốt"
                             "ERROR" -> "Lỗi socket"
                             "DISCONNECTED" -> "Mất mạng"
-                            else -> "Đang chờ"
+                            else -> "Đang chờ socket"
                         },
                         style = MaterialTheme.typography.bodySmall,
                         color = MaterialTheme.colorScheme.onSurfaceVariant,
-                        fontSize = 11.5.sp
+                        fontSize = 11.sp,
+                        fontWeight = FontWeight.Medium,
+                        maxLines = 1,
+                        overflow = TextOverflow.Ellipsis
                     )
                 }
 
                 // Screen & Sleep State Badge
                 Row(
                     verticalAlignment = Alignment.CenterVertically,
+                    horizontalArrangement = Arrangement.Center,
                     modifier = Modifier
+                        .weight(1f)
                         .clip(RoundedCornerShape(8.dp))
                         .background(MaterialTheme.colorScheme.surfaceVariant)
-                        .padding(horizontal = 10.dp, vertical = 5.dp)
+                        .padding(horizontal = 8.dp, vertical = 6.dp)
                 ) {
                     Box(
                         modifier = Modifier
-                            .size(8.dp)
+                            .size(7.dp)
                             .clip(CircleShape)
                             .background(if (isScreenOn) StatusGreen else StatusAmber)
                     )
@@ -1181,7 +1272,10 @@ private fun MinimalHeroStatusCard(
                         text = if (isScreenOn) "Màn hình: Sáng" else "Màn hình: Tắt (Ngủ)",
                         style = MaterialTheme.typography.bodySmall,
                         color = MaterialTheme.colorScheme.onSurfaceVariant,
-                        fontSize = 11.5.sp
+                        fontSize = 11.sp,
+                        fontWeight = FontWeight.Medium,
+                        maxLines = 1,
+                        overflow = TextOverflow.Ellipsis
                     )
                 }
             }
@@ -1216,24 +1310,17 @@ private fun MinimalHeroStatusCard(
                 }
             }
 
-            Spacer(modifier = Modifier.height(10.dp))
+            Spacer(modifier = Modifier.height(8.dp))
 
             Text(
-                text = "Kiểm tra mạng tới Google (mtalk.google.com:5228)",
-                style = MaterialTheme.typography.titleSmall,
-                fontWeight = FontWeight.Bold,
-                color = MaterialTheme.colorScheme.onSurface
-            )
-            Text(
-                text = "Chỉ kiểm tra đường truyền TCP từ máy tới server Google, không can thiệp kết nối FCM thật của GMS",
+                text = "Kiểm tra kết nối TCP socket mtalk.google.com:5228",
                 style = MaterialTheme.typography.bodySmall,
                 color = MaterialTheme.colorScheme.onSurfaceVariant,
                 fontSize = 11.sp,
-                textAlign = androidx.compose.ui.text.style.TextAlign.Center,
-                modifier = Modifier.padding(horizontal = 8.dp)
+                textAlign = TextAlign.Center
             )
 
-            Spacer(modifier = Modifier.height(12.dp))
+            Spacer(modifier = Modifier.height(10.dp))
 
             // Action Button: Test Network to Google
             Button(
@@ -1244,9 +1331,10 @@ private fun MinimalHeroStatusCard(
                     containerColor = MaterialTheme.colorScheme.surfaceVariant,
                     contentColor = MaterialTheme.colorScheme.onSurface
                 ),
+                contentPadding = PaddingValues(horizontal = 14.dp, vertical = 10.dp),
                 modifier = Modifier
                     .fillMaxWidth()
-                    .defaultMinSize(minHeight = 48.dp)
+                    .defaultMinSize(minHeight = 44.dp)
                     .testTag("repair_now_button")
             ) {
                 if (isRepairing) {
@@ -1259,7 +1347,7 @@ private fun MinimalHeroStatusCard(
                     Text(
                         text = "Đang kiểm tra mạng...",
                         fontWeight = FontWeight.SemiBold,
-                        fontSize = 13.5.sp
+                        fontSize = 13.sp
                     )
                 } else {
                     Icon(
@@ -1269,9 +1357,9 @@ private fun MinimalHeroStatusCard(
                     )
                     Spacer(modifier = Modifier.width(6.dp))
                     Text(
-                        text = "Kiểm tra mạng tới mtalk.google.com",
+                        text = "Kiểm tra mạng mtalk.google.com",
                         fontWeight = FontWeight.SemiBold,
-                        fontSize = 13.5.sp
+                        fontSize = 13.sp
                     )
                 }
             }
